@@ -1,313 +1,287 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
-    Activity,
-    AlertTriangle,
-    Clock,
-    ArrowRight,
-    TrendingUp,
-    Headphones,
-    CheckCircle2,
-    Plus
+    Search,
+    Download,
+    ArrowRight
 } from 'lucide-react';
-import type { CaseAssessment, RiskCategory } from '../types';
-import { analysisService } from '../services/analysisService';
+import { OFFICIAL_CALLER_SCENARIO } from '../data/demoScript';
+
+interface CallRecord {
+    id: string;
+    time: string;
+    date: string;
+    language: string;
+    duration: string;
+    svi: number;
+    risk: 'LOW' | 'MODERATE' | 'HIGH' | 'CRITICAL';
+    status: 'DISPATCHED' | 'VERIFIED' | 'MONITORING';
+    callerMasked: string;
+}
+
+const INITIAL_CALLS: CallRecord[] = [
+    {
+        id: OFFICIAL_CALLER_SCENARIO.callId,
+        time: '10:42 AM',
+        date: '22-09-2026',
+        language: 'Hindi',
+        duration: '00:24',
+        svi: OFFICIAL_CALLER_SCENARIO.assessment.svi,
+        risk: OFFICIAL_CALLER_SCENARIO.assessment.risk,
+        status: 'DISPATCHED',
+        callerMasked: OFFICIAL_CALLER_SCENARIO.callerNumber
+    },
+    {
+        id: 'ERSS-2026-0481',
+        time: '10:36 AM',
+        date: '22-09-2026',
+        language: 'Tamil',
+        duration: '06:18',
+        svi: 64,
+        risk: 'HIGH',
+        status: 'VERIFIED',
+        callerMasked: '+91 94XXX-XX874'
+    },
+    {
+        id: 'ERSS-2026-0480',
+        time: '10:14 AM',
+        date: '22-09-2026',
+        language: 'Telugu',
+        duration: '05:10',
+        svi: 72,
+        risk: 'HIGH',
+        status: 'DISPATCHED',
+        callerMasked: '+91 97XXX-XX331'
+    },
+    {
+        id: 'ERSS-2026-0479',
+        time: '10:02 AM',
+        date: '22-09-2026',
+        language: 'English',
+        duration: '03:41',
+        svi: 28,
+        risk: 'MODERATE',
+        status: 'MONITORING',
+        callerMasked: '+91 99XXX-XX412'
+    },
+    {
+        id: 'ERSS-2026-0478',
+        time: '09:45 AM',
+        date: '22-09-2026',
+        language: 'English',
+        duration: '02:15',
+        svi: 14,
+        risk: 'LOW',
+        status: 'VERIFIED',
+        callerMasked: '+91 96XXX-XX905'
+    }
+];
 
 const Dashboard: React.FC = () => {
     const navigate = useNavigate();
-    const [cases, setCases] = useState<CaseAssessment[]>([]);
+    const [calls] = useState<CallRecord[]>(INITIAL_CALLS);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [riskFilter, setRiskFilter] = useState('ALL');
 
-    useEffect(() => {
-        const data = analysisService.getCases();
-        setCases(data);
-    }, []);
+    const filteredCalls = calls.filter(c => {
+        const matchesSearch =
+            !searchQuery.trim() ||
+            c.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            c.language.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            c.callerMasked.includes(searchQuery);
 
-    const getGreeting = () => {
-        const hour = new Date().getHours();
-        if (hour < 12) return 'Good morning';
-        if (hour < 17) return 'Good afternoon';
-        return 'Good evening';
-    };
+        const matchesRisk = riskFilter === 'ALL' || c.risk === riskFilter;
 
-    const getRiskBadgeStyles = (risk: RiskCategory) => {
+        return matchesSearch && matchesRisk;
+    });
+
+    const getRiskBadge = (risk: string) => {
         switch (risk) {
             case 'CRITICAL':
-                return 'bg-zinc-900 text-white border-zinc-800 shadow-[0_0_15px_rgba(0,0,0,0.1)] ring-1 ring-inset ring-zinc-700/50';
+                return 'bg-red-700 text-white font-bold';
             case 'HIGH':
-                return 'bg-amber-100 text-amber-700 border-amber-200 ring-1 ring-inset ring-amber-300';
+                return 'bg-amber-100 text-amber-900 border border-amber-300 font-bold';
             case 'MODERATE':
-                return 'bg-zinc-100 text-zinc-600 border-zinc-200';
+                return 'bg-slate-100 text-slate-700 border border-slate-300';
             case 'LOW':
-                return 'bg-lime-200 text-lime-900 border-lime-300'; // Match Awwwards lime mapping
+                return 'bg-emerald-100 text-emerald-800 border border-emerald-300 font-semibold';
+            default:
+                return 'bg-slate-100 text-slate-700';
         }
     };
 
-    const totalAnalyses = 18;
-    const highRiskCount = cases.filter(c => c.risk === 'HIGH').length + 3;
-    const criticalCount = cases.filter(c => c.risk === 'CRITICAL').length + 1;
-    const processingCount = cases.filter(c => c.status !== 'COMPLETE').length;
+    const handleExportCsv = () => {
+        const headers = 'Call ID,Date,Time,Language,Duration,SVI Score,Risk,Status,Caller\n';
+        const rows = calls.map(c =>
+            `${c.id},${c.date},${c.time},${c.language},${c.duration},${c.svi},${c.risk},${c.status},${c.callerMasked}`
+        ).join('\n');
+
+        const blob = new Blob([headers + rows], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `ERSS_Triage_Ledger_${new Date().toISOString().slice(0, 10)}.csv`;
+        a.click();
+    };
 
     return (
-        <div className="space-y-8 animate-fade-in text-zinc-900">
-
-            {/* Welcome Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-zinc-200/80 pb-6">
+        <div className="space-y-6">
+            {/* Header */}
+            <div className="bg-white border border-slate-300 rounded-md p-4 shadow-xs flex flex-wrap items-center justify-between gap-4">
                 <div>
-                    <h2 className="font-display font-medium text-3xl text-black tracking-tight">
-                        {getGreeting()}, Operator.
+                    <h2 className="text-lg font-bold text-slate-900">
+                        Emergency Response Call Ledger
                     </h2>
-                    <p className="text-zinc-500 text-sm mt-1.5 font-light">
-                        AI-assisted real-time stress and vulnerability assessment portal.
+                    <p className="text-xs text-slate-500 font-light mt-0.5">
+                        Central registry of voice calls triaged by Sahaaya AI automated acoustic telemetry
                     </p>
                 </div>
 
-                <Link
-                    to="/analysis"
-                    className="inline-flex items-center gap-2 bg-zinc-900 text-white hover:bg-black font-medium px-5 py-2.5 rounded-full text-sm transition-all shadow-lg shadow-black/10 focus:ring-2 focus:ring-zinc-900 hover:scale-[1.02] cursor-pointer"
-                >
-                    <Plus size={16} className="stroke-[2.5]" />
-                    <span>New Voice Analysis</span>
-                </Link>
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={handleExportCsv}
+                        className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 rounded text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-colors"
+                    >
+                        <Download size={14} />
+                        <span>Export CSV Ledger</span>
+                    </button>
+
+
+                </div>
             </div>
 
-            {/* Metrics Summary cards - Using V2 layout with Light colors */}
+            {/* Metric Summary Cards */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-
-                <div className="bg-white border text-zinc-900 border-zinc-200 rounded-3xl p-5 shadow-sm flex flex-col justify-between hover:border-zinc-300 transition-colors group">
-                    <div className="flex justify-between items-start">
-                        <div className="w-10 h-10 rounded-full bg-zinc-100 flex items-center justify-center text-zinc-600">
-                            <Activity size={18} />
-                        </div>
-                    </div>
-                    <div className="mt-6">
-                        <h4 className="font-display font-medium text-4xl">{totalAnalyses}</h4>
-                        <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mt-1">Total Analyses</p>
-                    </div>
-                </div>
-
-                <div className="bg-white border text-zinc-900 border-zinc-200 rounded-3xl p-5 shadow-sm flex flex-col justify-between hover:border-zinc-300 transition-colors group">
-                    <div className="flex justify-between items-start">
-                        <div className="w-10 h-10 rounded-full bg-amber-50 flex items-center justify-center text-amber-600">
-                            <AlertTriangle size={18} />
-                        </div>
-                    </div>
-                    <div className="mt-6">
-                        <h4 className="font-display font-medium text-4xl">{highRiskCount}</h4>
-                        <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mt-1">High Risk</p>
-                    </div>
-                </div>
-
-                {/* Dark Awwwards Tile for Critical Risk */}
-                <div className="bg-zinc-900 border-zinc-800 text-white border rounded-3xl p-5 shadow-sm flex flex-col justify-between transition-colors group relative overflow-hidden">
-                    <div className="absolute -right-8 -top-8 w-24 h-24 bg-white/5 rounded-full blur-2xl"></div>
-                    <div className="flex justify-between items-start relative z-10">
-                        <div className="w-10 h-10 rounded-full flex items-center justify-center text-white border border-white/20">
-                            <TrendingUp size={18} />
-                        </div>
-                    </div>
-                    <div className="mt-6 relative z-10">
-                        <h4 className="font-display font-medium text-4xl">{criticalCount}</h4>
-                        <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mt-1">Critical Risk</p>
-                    </div>
-                </div>
-
-                {/* Lime Awwwards Tile for Processing */}
-                <div className="bg-[var(--color-accent-lime)] border border-lime-300 text-lime-950 rounded-3xl p-5 shadow-sm flex flex-col justify-between group">
-                    <div className="flex justify-between items-start">
-                        <div className="w-10 h-10 rounded-full bg-white/40 flex items-center justify-center text-lime-900 backdrop-blur-sm">
-                            <Headphones size={18} className="animate-pulse" />
-                        </div>
-                    </div>
-                    <div className="mt-6">
-                        <h4 className="font-display font-medium text-4xl">{processingCount}</h4>
-                        <p className="text-[10px] font-semibold text-lime-800 uppercase tracking-wider mt-1">Processing</p>
-                    </div>
-                </div>
-
-            </div>
-
-            {/* Assessment Pipeline Overview */}
-            <div className="bg-white border border-zinc-200 rounded-3xl p-6 shadow-sm">
-                <div className="flex items-center justify-between mb-8">
-                    <div>
-                        <h3 className="font-display font-medium text-lg text-black tracking-wide">
-                            Pipeline Architecture
-                        </h3>
-                    </div>
-                    <span className="text-[10px] font-mono bg-zinc-100 border border-zinc-200 text-zinc-600 px-3 py-1.5 rounded-full font-bold uppercase tracking-widest shadow-inner">
-                        LIVE DISPATCH
+                <div className="bg-white border border-slate-300 rounded-md p-4 shadow-xs">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                        Total Calls Logged
                     </span>
+                    <p className="text-2xl font-bold font-mono text-slate-900 mt-1">{calls.length}</p>
                 </div>
 
-                {/* Pipeline Flow Container */}
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 md:gap-3 relative px-2 mb-2">
+                <div className="bg-white border border-slate-300 rounded-md p-4 shadow-xs">
+                    <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wider block">
+                        High Risk Calls
+                    </span>
+                    <p className="text-2xl font-bold font-mono text-amber-800 mt-1">
+                        {calls.filter(c => c.risk === 'HIGH').length}
+                    </p>
+                </div>
 
-                    {/* Connectors */}
-                    <div className="hidden md:flex items-center w-[25%] absolute left-[12.5%] top-[1.25rem] z-0 px-4">
-                        <div className="w-full h-[1px] bg-zinc-200"></div>
-                    </div>
-                    <div className="hidden md:flex items-center w-[25%] absolute left-[37.5%] top-[1.25rem] z-0 px-4">
-                        <div className="w-full h-[1px] bg-zinc-300 relative overflow-hidden">
-                            <div className="absolute top-0 left-0 h-full w-12 bg-gradient-to-r from-transparent via-[var(--color-accent-lime)] to-transparent translate-x-[-100%] animate-[shimmer_2s_infinite]"></div>
-                        </div>
-                    </div>
-                    <div className="hidden md:flex items-center w-[25%] absolute left-[62.5%] top-[1.25rem] z-0 px-4">
-                        <div className="w-full h-[1px] bg-zinc-200"></div>
-                    </div>
+                <div className="bg-red-700 text-white rounded-md p-4 shadow-xs">
+                    <span className="text-[10px] font-bold text-red-200 uppercase tracking-wider block">
+                        Critical Action Required
+                    </span>
+                    <p className="text-2xl font-bold font-mono text-white mt-1">
+                        {calls.filter(c => c.risk === 'CRITICAL').length}
+                    </p>
+                </div>
 
-                    {/* Step 1: Received */}
-                    <div className="flex flex-col items-center md:items-start group relative z-10 pt-1">
-                        <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center border border-zinc-200 text-zinc-900 shadow-sm mb-4">
-                            <CheckCircle2 size={16} />
-                        </div>
-                        <span className="text-[9px] uppercase font-bold tracking-widest text-zinc-400">Node // 01</span>
-                        <span className="font-display font-medium text-black mt-1 text-sm tracking-wide">RECEIVED</span>
-                        <p className="text-xs text-zinc-500 mt-1 font-light text-center md:text-left leading-relaxed max-w-[90%]">
-                            Feed attached.
-                        </p>
-                    </div>
-
-                    {/* Step 2: Transcribing */}
-                    <div className="flex flex-col items-center md:items-start group relative z-10 pt-1">
-                        <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center border border-zinc-200 text-zinc-900 shadow-sm mb-4">
-                            <CheckCircle2 size={16} />
-                        </div>
-                        <span className="text-[9px] uppercase font-bold tracking-widest text-zinc-400">Node // 02</span>
-                        <span className="font-display font-medium text-black mt-1 text-sm tracking-wide">TRANSCRIBING</span>
-                        <p className="text-xs text-zinc-500 mt-1 font-light text-center md:text-left leading-relaxed max-w-[90%]">
-                            Translating audio layer.
-                        </p>
-                    </div>
-
-                    {/* Step 3: Analysing */}
-                    <div className="flex flex-col items-center md:items-start group relative z-10 pt-1">
-                        <div className="w-10 h-10 rounded-full bg-[var(--color-accent-lime)] flex items-center justify-center border border-lime-400 text-lime-950 shadow-md shadow-lime-300/30 mb-4 relative">
-                            <span className="w-2 h-2 rounded-full bg-black animate-pulse"></span>
-                        </div>
-                        <span className="text-[9px] uppercase font-bold tracking-widest text-lime-600">Node // 03</span>
-                        <span className="font-display font-medium text-black mt-1 text-sm tracking-wide">ANALYSING</span>
-                        <p className="text-xs text-zinc-500 mt-1 font-light text-center md:text-left leading-relaxed max-w-[90%]">
-                            Processing structures.
-                        </p>
-                    </div>
-
-
-                    {/* Step 4: Assessment Ready */}
-                    <div className="flex flex-col items-center md:items-start group relative z-10 pt-1">
-                        <div className="w-10 h-10 rounded-full bg-zinc-50 flex items-center justify-center border border-zinc-200 text-zinc-400 mb-4">
-                            <Clock size={16} />
-                        </div>
-                        <span className="text-[9px] uppercase font-bold tracking-widest text-zinc-400">Terminal // 04</span>
-                        <span className="font-display font-medium text-zinc-400 mt-1 text-sm tracking-wide">ASSESSMENT</span>
-                        <p className="text-xs text-zinc-400 mt-1 font-light text-center md:text-left leading-relaxed max-w-[90%]">
-                            Pending lock.
-                        </p>
-                    </div>
-
+                <div className="bg-white border border-slate-300 rounded-md p-4 shadow-xs">
+                    <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider block">
+                        Field Units Dispatched
+                    </span>
+                    <p className="text-2xl font-bold font-mono text-emerald-800 mt-1">
+                        {calls.filter(c => c.status === 'DISPATCHED').length}
+                    </p>
                 </div>
             </div>
 
-            {/* RECENT ANALYSES Ledger Section */}
-            <div className="bg-white border border-zinc-200 rounded-3xl shadow-sm overflow-hidden">
-                <div className="p-6 border-b border-zinc-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                    <div>
-                        <h3 className="font-display font-medium text-lg text-black">
-                            Case Assessment Ledger
-                        </h3>
+            {/* Ledger Table Box */}
+            <div className="bg-white border border-slate-300 rounded-md shadow-xs overflow-hidden">
+                {/* Search & Filter Strip */}
+                <div className="p-3 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
+                    <div className="relative">
+                        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <input
+                            type="text"
+                            placeholder="Filter by Call ID, Dialect..."
+                            value={searchQuery}
+                            onChange={e => setSearchQuery(e.target.value)}
+                            className="w-52 sm:w-64 pl-9 pr-3 py-1.5 bg-white border border-slate-300 rounded text-xs text-slate-800 placeholder-slate-400 outline-none focus:border-blue-900"
+                        />
                     </div>
-                </div>
 
-                {cases.length === 0 ? (
-                    <div className="p-20 text-center max-w-sm mx-auto">
-                        <Activity className="mx-auto text-zinc-300 stroke-[1.5]" size={36} />
-                        <h3 className="text-sm font-medium text-black mt-4">No cases logged</h3>
-                        <Link
-                            to="/analysis"
-                            className="inline-block mt-4 text-xs font-semibold text-zinc-500 hover:text-black"
+                    <div className="flex items-center gap-2">
+                        <span className="text-xs font-semibold text-slate-500">Filter Risk:</span>
+                        <select
+                            value={riskFilter}
+                            onChange={e => setRiskFilter(e.target.value)}
+                            className="bg-white border border-slate-300 rounded px-2.5 py-1 text-xs text-slate-800 outline-none"
                         >
-                            Open Terminal &rarr;
-                        </Link>
+                            <option value="ALL">All Risk Levels</option>
+                            <option value="CRITICAL">Critical Only</option>
+                            <option value="HIGH">High Only</option>
+                            <option value="MODERATE">Moderate Only</option>
+                            <option value="LOW">Low Only</option>
+                        </select>
                     </div>
-                ) : (
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left text-sm border-collapse">
-                            <thead>
-                                <tr className="bg-zinc-50 border-b border-zinc-100 text-zinc-500 font-bold text-[10px] uppercase tracking-widest">
-                                    <th className="py-5 px-8">Identifier</th>
-                                    <th className="py-5 px-4 text-center">Dialect</th>
-                                    <th className="py-5 px-4 font-mono text-center">T(s)</th>
-                                    <th className="py-5 px-4 text-center">Score</th>
-                                    <th className="py-5 px-4 text-center">Classification</th>
-                                    <th className="py-5 px-6 text-right">Route</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-zinc-100">
-                                {cases.map((item) => (
-                                    <tr
-                                        key={item.id}
-                                        onClick={() => navigate(`/analysis/${item.id}`)}
-                                        className="hover:bg-zinc-50 transition-all cursor-pointer group"
-                                    >
-                                        <td className="py-5 px-8">
-                                            <div className="flex flex-col">
-                                                <span className="font-display font-semibold text-black group-hover:text-[var(--color-accent-lime-hover)] transition-colors">
-                                                    {item.id}
-                                                </span>
-                                                <span className="text-[10px] uppercase tracking-wider font-mono text-zinc-500 mt-0.5">{item.time}</span>
-                                            </div>
-                                        </td>
+                </div>
 
-                                        <td className="py-5 px-4 text-center">
-                                            <span className="text-[11px] text-zinc-600 bg-zinc-100 px-2.5 py-1 rounded-full border border-zinc-200">
-                                                {item.language}
+                {/* Table */}
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs border-collapse">
+                        <thead>
+                            <tr className="bg-slate-100 border-b border-slate-200 text-slate-600 font-bold uppercase text-[10px] tracking-wider">
+                                <th className="p-3">Call Incident ID</th>
+                                <th className="p-3">Logged Date / Time</th>
+                                <th className="p-3 text-center">Dialect</th>
+                                <th className="p-3 text-center">Duration</th>
+                                <th className="p-3 text-center">SVI Score</th>
+                                <th className="p-3 text-center">Triage Classification</th>
+                                <th className="p-3 text-center">Action Status</th>
+                                <th className="p-3 text-right">Terminal Action</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-200">
+                            {filteredCalls.map(item => (
+                                <tr key={item.id} className="hover:bg-slate-50 transition-colors">
+                                    <td className="p-3 font-mono font-bold text-slate-900">
+                                        {item.id}
+                                    </td>
+                                    <td className="p-3 text-slate-600">
+                                        {item.date} {item.time}
+                                    </td>
+                                    <td className="p-3 text-center font-medium text-slate-800">
+                                        {item.language}
+                                    </td>
+                                    <td className="p-3 text-center font-mono text-slate-600">
+                                        {item.duration}
+                                    </td>
+                                    <td className="p-3 text-center font-mono font-bold text-slate-900 text-sm">
+                                        {item.svi}
+                                    </td>
+                                    <td className="p-3 text-center">
+                                        <span className={`px-2 py-0.5 rounded text-[10px] font-mono ${getRiskBadge(item.risk)}`}>
+                                            {item.risk}
+                                        </span>
+                                    </td>
+                                    <td className="p-3 text-center">
+                                        {item.status === 'DISPATCHED' ? (
+                                            <span className="text-red-700 font-bold bg-red-50 border border-red-200 px-2 py-0.5 rounded text-[10px]">
+                                                QRT Dispatched
                                             </span>
-                                        </td>
-
-                                        <td className="py-5 px-4 text-zinc-500 font-mono text-xs text-center">
-                                            {item.duration}
-                                        </td>
-
-                                        <td className="py-5 px-4 text-center">
-                                            <div className="inline-flex items-end font-mono">
-                                                <span className="text-lg font-bold text-black">{item.status === 'COMPLETE' ? item.svi : '—'}</span>
-                                            </div>
-                                        </td>
-
-                                        <td className="py-5 px-4 text-center">
-                                            {item.status === 'COMPLETE' ? (
-                                                <span className={`inline-block px-3 py-1 text-[10px] font-bold uppercase tracking-wider rounded-full ${getRiskBadgeStyles(item.risk)}`}>
-                                                    {item.risk}
-                                                </span>
-                                            ) : (
-                                                <span className="inline-block px-3 py-1 text-[10px] font-bold uppercase tracking-wider rounded-full bg-zinc-100 text-zinc-500 border border-zinc-200 animate-pulse">
-                                                    Working
-                                                </span>
-                                            )}
-                                        </td>
-
-                                        <td className="py-5 px-8 text-right">
-                                            <button
-                                                className="w-8 h-8 rounded-full bg-zinc-100 hover:bg-black text-zinc-600 hover:text-white inline-flex items-center justify-center transition-all group-hover:bg-black group-hover:text-[var(--color-accent-lime)]"
-                                            >
-                                                <ArrowRight size={14} className="-rotate-45" />
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
+                                        ) : (
+                                            <span className="text-slate-600 text-[10px]">
+                                                {item.status}
+                                            </span>
+                                        )}
+                                    </td>
+                                    <td className="p-3 text-right">
+                                        <button
+                                            onClick={() => navigate('/analysis')}
+                                            className="px-2.5 py-1 bg-blue-900 hover:bg-blue-950 text-white rounded text-[11px] font-semibold inline-flex items-center gap-1 cursor-pointer transition-colors"
+                                        >
+                                            <span>Open Terminal</span>
+                                            <ArrowRight size={11} />
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
             </div>
-
-            {/* Global Keyframes embedded inside class components for unique animations */}
-            <style>{`
-                @keyframes shimmer {
-                    100% {
-                        transform: translateX(100%);
-                    }
-                }
-            `}</style>
         </div>
     );
 };

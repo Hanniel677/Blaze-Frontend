@@ -2,10 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import {
     Activity,
+    PhoneCall,
+    FileText,
+    Settings,
     LogOut,
-    Shield,
-    Database,
-    Network
+    ShieldCheck
 } from 'lucide-react';
 import type { Operator } from '../types';
 import { authService } from '../services/authService';
@@ -17,23 +18,22 @@ interface AppShellProps {
 const AppShell: React.FC<AppShellProps> = ({ children }) => {
     const navigate = useNavigate();
     const location = useLocation();
-    const [operator, setOperator] = useState<Operator | null>(null);
-    const [currentTime, setCurrentTime] = useState(new Date());
+    const [operator] = useState<Operator | null>(() => authService.getOperator() || {
+        id: 'OP-0482',
+        name: 'Priya Sharma',
+        email: 'priya.sharma@erss112.gov.in',
+        role: 'Duty Officer',
+        department: 'Emergency Triage Desk'
+    });
+
+    const [currentTime, setCurrentTime] = useState<string>(() => new Date().toLocaleTimeString('en-IN', { hour12: false }));
 
     useEffect(() => {
-        const currentOperator = authService.getOperator();
-        if (!currentOperator) {
-            navigate('/login');
-        } else {
-            setOperator(currentOperator);
-        }
-
         const timer = setInterval(() => {
-            setCurrentTime(new Date());
+            setCurrentTime(new Date().toLocaleTimeString('en-IN', { hour12: false }));
         }, 1000);
-
         return () => clearInterval(timer);
-    }, [navigate]);
+    }, []);
 
     const handleLogout = () => {
         authService.logout();
@@ -41,93 +41,104 @@ const AppShell: React.FC<AppShellProps> = ({ children }) => {
     };
 
     const navItems = [
-        { name: 'Dashboard', path: '/dashboard', icon: Activity },
-        { name: 'Voice Analysis', path: '/analysis', icon: Network },
-        { name: 'Settings', path: '/settings', icon: Database },
+        { name: 'Live Call Triage', path: '/analysis', icon: PhoneCall },
+        { name: 'Emergency Call Ledger', path: '/dashboard', icon: FileText },
+        { name: 'System Settings', path: '/settings', icon: Settings },
     ];
 
     const currentPath = location.pathname;
 
     return (
-        <div className="min-h-screen bg-[var(--color-surface-base)] flex flex-col font-sans text-zinc-900 selection:bg-[var(--color-accent-lime)] selection:text-black">
+        <div className="min-h-screen bg-slate-100 flex flex-col font-sans text-slate-800">
+            {/* Top Official National Emergency Helpline Bar */}
+            <div className="bg-slate-900 text-slate-200 text-[11px] px-4 py-1 flex flex-wrap items-center justify-between border-b border-slate-800">
+                <div className="flex items-center gap-4">
+                    <span className="font-semibold text-amber-400">EMERGENCY RESPONSE SUPPORT SYSTEM (ERSS)</span>
+                    <span className="hidden sm:inline text-slate-400">|</span>
+                    <span className="hidden sm:inline">National Emergency: <strong className="text-white">112</strong></span>
+                    <span className="hidden md:inline">Women Helpline: <strong className="text-white">1091</strong></span>
+                    <span className="hidden md:inline">Cyber Crime: <strong className="text-white">1930</strong></span>
+                </div>
+                <div className="flex items-center gap-3 font-mono text-[10px]">
+                    <span className="flex items-center gap-1 text-emerald-400 font-semibold">
+                        <ShieldCheck size={12} /> SECURED TERMINAL
+                    </span>
+                    <span>{currentTime} IST</span>
+                </div>
+            </div>
 
-            {/* V2 Floating Navigation Pill (Previous Design) - Updated to Light Theme */}
-            <header className="fixed top-6 left-1/2 -translate-x-1/2 bg-white/80 backdrop-blur-xl border border-zinc-200/80 rounded-full px-2 py-2 flex items-center justify-between w-[95%] max-w-[1200px] z-[100] shadow-xl shadow-black/5">
-
-                {/* Brand Logo & Name */}
-                <Link to="/dashboard" className="flex items-center gap-3 pl-4 pr-6 shrink-0 group">
-                    <div className="w-8 h-8 rounded-full bg-zinc-900 overflow-hidden flex items-center justify-center relative">
-                        <div className="absolute inset-0 opacity-20 bg-gradient-to-tr from-transparent via-transparent to-white group-hover:opacity-100 transition-opacity"></div>
-                        <Activity size={16} className="text-[var(--color-accent-lime)]" />
-                    </div>
-                    <div className="flex flex-col">
-                        <span className="font-display font-medium tracking-wide text-zinc-900 leading-none">
-                            Sahaaya <span className="font-light">AI</span>
-                        </span>
-                        <span className="text-[9px] uppercase tracking-widest text-zinc-500 mt-1 font-mono">v2.4.0-stable</span>
-                    </div>
-                </Link>
-
-                {/* Central Desktop Navigation */}
-                <nav className="hidden md:flex items-center gap-1.5 p-1 bg-zinc-100/50 rounded-full border border-zinc-200/50 backdrop-blur-sm">
-                    {navItems.map((item) => {
-                        const isActive = currentPath.startsWith(item.path);
-                        const Icon = item.icon;
-                        return (
-                            <Link
-                                key={item.path}
-                                to={item.path}
-                                className={`flex items-center gap-2 px-5 py-2 rounded-full text-xs font-semibold tracking-wide transition-all ${isActive
-                                    ? 'bg-white text-zinc-900 shadow-sm border border-zinc-200'
-                                    : 'text-zinc-500 hover:text-zinc-900 hover:bg-white/50'
-                                    }`}
-                            >
-                                <Icon size={14} className={isActive ? 'text-[var(--color-accent-lime-hover)]' : ''} />
-                                {item.name}
-                            </Link>
-                        );
-                    })}
-                </nav>
-
-                {/* Operator Session Metrics / Logout */}
-                {operator && (
-                    <div className="flex items-center gap-3 pr-2 shrink-0">
-                        {/* Secure status indicator */}
-                        <div className="hidden lg:flex flex-col items-end mr-4">
-                            <div className="flex items-center gap-1.5 align-baseline">
-                                <Shield size={10} className="text-emerald-500" />
-                                <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Sys.Secure</span>
-                            </div>
-                            <span className="text-[9px] font-mono text-zinc-400 mt-1">{currentTime.toISOString().split('T')[1].slice(0, 8)} UTC</span>
+            {/* Official Portal Header */}
+            <header className="bg-blue-950 text-white shadow-sm border-b border-blue-900">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                    {/* Official Emblem & Portal Title */}
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-md bg-blue-900 border border-blue-700 flex items-center justify-center text-amber-400 font-bold shrink-0">
+                            <Activity size={22} />
                         </div>
-
-                        {/* Profile Pill */}
-                        <div className="flex items-center gap-3 bg-zinc-100 border border-zinc-200 pl-3 pr-1 py-1 rounded-full">
-                            <div className="text-right hidden sm:block">
-                                <div className="text-xs font-bold text-zinc-900 tracking-wide">{operator.name}</div>
-                                <div className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest">{operator.id}</div>
+                        <div>
+                            <div className="flex items-center gap-2">
+                                <h1 className="font-display font-bold text-lg leading-tight tracking-tight text-white">
+                                    SAHAAYA AI : आपातकालीन आवाज़ ट्राइएज
+                                </h1>
                             </div>
-                            <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-white text-xs font-bold shadow-sm">
-                                {operator.name.charAt(0)}
+                        </div>
+                    </div>
+
+                    {/* Operator Station Info & Logout */}
+                    {operator && (
+                        <div className="flex items-center gap-3 self-end md:self-auto bg-blue-900/60 border border-blue-800 px-3 py-1.5 rounded-lg text-xs">
+                            <div className="text-right">
+                                <span className="font-semibold block text-slate-100">{operator.name}</span>
+                                <span className="text-[10px] text-blue-300 font-mono">STAFF ID: {operator.id}</span>
                             </div>
                             <button
                                 onClick={handleLogout}
-                                className="w-8 h-8 rounded-full bg-red-50 hover:bg-red-500 hover:text-white text-red-500 flex items-center justify-center transition-all ml-1 group"
-                                title="Terminate Session"
+                                className="p-1 hover:bg-red-600 hover:text-white text-slate-300 rounded transition-colors"
+                                title="Sign out"
                             >
-                                <LogOut size={14} className="group-hover:-translate-x-0.5 transition-transform" />
+                                <LogOut size={14} />
                             </button>
                         </div>
+                    )}
+                </div>
+
+                {/* Navigation Bar */}
+                <div className="bg-blue-900 border-t border-blue-800">
+                    <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center gap-1 overflow-x-auto">
+                        {navItems.map((item) => {
+                            const isActive = currentPath.startsWith(item.path);
+                            const Icon = item.icon;
+                            return (
+                                <Link
+                                    key={item.path}
+                                    to={item.path}
+                                    className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold tracking-wide transition-colors whitespace-nowrap border-b-2 ${
+                                        isActive
+                                            ? 'border-amber-400 text-amber-300 bg-blue-950/50'
+                                            : 'border-transparent text-blue-200 hover:text-white hover:bg-blue-800/50'
+                                    }`}
+                                >
+                                    <Icon size={14} />
+                                    <span>{item.name}</span>
+                                </Link>
+                            );
+                        })}
                     </div>
-                )}
+                </div>
+
+                {/* Tricolor Ribbon */}
+                <div className="gov-tricolor" />
             </header>
 
-            {/* Main Workspace Frame */}
-            <main className="flex-1 w-full max-w-[1200px] mx-auto px-4 sm:px-6 md:px-8 pt-32 pb-16">
-                <div className="animate-fade-in transition-all duration-300 h-full">
-                    {children}
-                </div>
+            {/* Main Content Area */}
+            <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6">
+                {children}
             </main>
+
+            {/* Minimalist Government Footer */}
+            <footer className="bg-slate-900 text-slate-400 text-xs py-3 border-t border-slate-800 text-center">
+                <p>Government of India — Emergency Response Support System (ERSS 112)</p>
+            </footer>
         </div>
     );
 };
