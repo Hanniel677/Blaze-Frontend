@@ -117,8 +117,10 @@ const VoiceAnalysis: React.FC = () => {
     const [isUploadedAudioPlaying, setIsUploadedAudioPlaying] = useState(false);
     const [isUploadedAnalyzing, setIsUploadedAnalyzing] = useState(false);
     const [uploadedAnalysisDone, setUploadedAnalysisDone] = useState(false);
+    const [uploadedAnalysisSeconds, setUploadedAnalysisSeconds] = useState(0);
     const [uploadedProgressStep, setUploadedProgressStep] = useState<string>('');
     const fileInputRef = useRef<HTMLInputElement | null>(null);
+    const uploadTimerRef = useRef<number | null>(null);
 
     // -------------------------------------------------------------
     // Shared Department Escalation & Handover States
@@ -140,7 +142,7 @@ const VoiceAnalysis: React.FC = () => {
     }, [displayedLines]);
 
     // -------------------------------------------------------------
-    // Simulated Call Streaming Engine
+    // Simulated Call Streaming Engine: Runs second-by-second
     // -------------------------------------------------------------
     useEffect(() => {
         if (inputMode === 'SIMULATED_LINE' && callStatus === 'CONNECTED') {
@@ -294,7 +296,7 @@ const VoiceAnalysis: React.FC = () => {
             micAudioCtxRef.current = null;
         }
 
-        // Trigger automated AI distress analysis
+        // Run automated AI distress analysis
         runMicDistressAnalysis();
     };
 
@@ -332,6 +334,7 @@ const VoiceAnalysis: React.FC = () => {
             url
         });
         setUploadedAnalysisDone(false);
+        setUploadedAnalysisSeconds(0);
         setIsUploadedAudioPlaying(false);
         setEscalated(false);
         setEscalationDocket(null);
@@ -350,32 +353,43 @@ const VoiceAnalysis: React.FC = () => {
             url: ''
         });
         setUploadedAnalysisDone(false);
+        setUploadedAnalysisSeconds(0);
         setIsUploadedAudioPlaying(false);
         setEscalated(false);
         setEscalationDocket(null);
     };
 
     const runUploadedAnalysis = () => {
+        if (uploadTimerRef.current) clearInterval(uploadTimerRef.current);
         setIsUploadedAnalyzing(true);
+        setUploadedAnalysisDone(false);
+        setUploadedAnalysisSeconds(0);
         setUploadedProgressStep('Calibrating speech acoustics & noise spectrum...');
 
-        setTimeout(() => {
-            setUploadedProgressStep('Parsing semantic crisis keywords & distress markers...');
-        }, 600);
+        const totalSec = activeUploadedScenario.durationSec || 24;
+        let elapsed = 0;
 
-        setTimeout(() => {
-            setUploadedProgressStep('Evaluating affective valence & vocal tremor instability...');
-        }, 1200);
+        uploadTimerRef.current = window.setInterval(() => {
+            elapsed += 1;
+            setUploadedAnalysisSeconds(elapsed);
 
-        setTimeout(() => {
-            setUploadedProgressStep('Synthesizing composite SVI & dimension weights...');
-        }, 1700);
+            if (elapsed === 2) {
+                setUploadedProgressStep('Extracting vocal pitch fluctuations & acoustic tremors...');
+            } else if (elapsed === 8) {
+                setUploadedProgressStep('Parsing semantic crisis keywords & direct threat indicators...');
+            } else if (elapsed === 14) {
+                setUploadedProgressStep('Evaluating emotional despair & cognitive load dynamics...');
+            } else if (elapsed === 19) {
+                setUploadedProgressStep('Finalizing multi-dimensional SVI weights & triage risk...');
+            }
 
-        setTimeout(() => {
-            setIsUploadedAnalyzing(false);
-            setUploadedAnalysisDone(true);
-            setUploadedProgressStep('');
-        }, 2100);
+            if (elapsed >= totalSec) {
+                if (uploadTimerRef.current) clearInterval(uploadTimerRef.current);
+                setIsUploadedAnalyzing(false);
+                setUploadedAnalysisDone(true);
+                setUploadedProgressStep('');
+            }
+        }, 120); // Fast simulation (~2.8s) streaming from 0 up to duration
     };
 
     const togglePlayUploadedAudio = () => {
@@ -397,10 +411,12 @@ const VoiceAnalysis: React.FC = () => {
         setCallStatus('ENDED');
         if (timerRef.current) clearInterval(timerRef.current);
         setDisplayedLines(officialScenario.lines);
+        setCallDuration(officialScenario.durationSec);
     };
 
     const handleReset = () => {
         if (timerRef.current) clearInterval(timerRef.current);
+        if (uploadTimerRef.current) clearInterval(uploadTimerRef.current);
         setCallStatus('WAITING');
         setCallDuration(0);
         setDisplayedLines([]);
@@ -408,8 +424,11 @@ const VoiceAnalysis: React.FC = () => {
         setEscalationDocket(null);
         setMicAnalysisComplete(false);
         setIsMicRecording(false);
+        setMicRecordDuration(0);
         setRecordedAudioUrl(null);
         setUploadedAnalysisDone(false);
+        setUploadedAnalysisSeconds(0);
+        setIsUploadedAnalyzing(false);
     };
 
     const handleEscalateCall = () => {
@@ -428,20 +447,20 @@ const VoiceAnalysis: React.FC = () => {
     };
 
     // -------------------------------------------------------------
-    // Assessment Calculation with Dimension Breakdown
+    // Real-Time Dynamic Assessment Calculation:
+    // Starts at ZERO (0) and updates as the call goes!
     // -------------------------------------------------------------
     const currentAssessment = useMemo(() => {
         if (inputMode === 'SIMULATED_LINE') {
-            const count = displayedLines.length;
-
-            if (count === 0) {
+            // Check if call is waiting / line idle
+            if (callStatus === 'WAITING') {
                 return {
                     svi: 0,
-                    risk: 'NORMAL' as const,
+                    risk: 'STANDBY' as const,
                     confidence: 0,
-                    vulnerabilityDomain: 'Awaiting Caller Statement...',
-                    stressLevel: 'No acoustic distress detected (0%)',
-                    recommendedAction: 'Awaiting caller speech input on emergency line.',
+                    vulnerabilityDomain: 'Awaiting Live Caller Statement...',
+                    stressLevel: 'Line idle (No acoustic telemetry)',
+                    recommendedAction: 'Click "Pick Up Call" to connect emergency line and start real-time telemetry.',
                     badgeClass: 'bg-slate-500 text-white',
                     scoreColor: 'text-slate-600',
                     borderClass: 'border-slate-300',
@@ -451,91 +470,178 @@ const VoiceAnalysis: React.FC = () => {
                         emotionalInstabilityScore: 0
                     } satisfies SviFactorBreakdown
                 };
-            } else if (count === 1) {
+            }
+
+            const sec = callDuration;
+
+            if (sec <= 0) {
                 return {
-                    svi: 48,
-                    risk: 'MODERATE' as const,
-                    confidence: 68,
-                    vulnerabilityDomain: 'Caste-based Harassment & Discrimination',
-                    stressLevel: 'Audible Vocal Quiver & Distress Markers (48%)',
-                    recommendedAction: 'Log caller location details and assess threat severity.',
-                    badgeClass: 'bg-amber-600 text-white',
-                    scoreColor: 'text-amber-600',
-                    borderClass: 'border-amber-400',
+                    svi: 0,
+                    risk: 'NORMAL' as const,
+                    confidence: 0,
+                    vulnerabilityDomain: 'Line Connected — Awaiting Speech Input',
+                    stressLevel: 'Calibrating acoustic filters (0%)',
+                    recommendedAction: 'Line connected. Telemetry engine tracking caller audio from baseline 0.',
+                    badgeClass: 'bg-slate-600 text-white',
+                    scoreColor: 'text-slate-600',
+                    borderClass: 'border-slate-300',
                     factorBreakdown: {
-                        acousticStressScore: 46,
-                        linguisticVulnerabilityScore: 52,
-                        emotionalInstabilityScore: 44
-                    } satisfies SviFactorBreakdown
-                };
-            } else if (count === 2) {
-                return {
-                    svi: 78,
-                    risk: 'HIGH' as const,
-                    confidence: 86,
-                    vulnerabilityDomain: 'Physical Assault & Direct Threats to Family',
-                    stressLevel: 'Heightened Pitch & Acute Vocal Tremor (78%)',
-                    recommendedAction: 'Active violence & threat detected. Police Control Room handover advised.',
-                    badgeClass: 'bg-orange-600 text-white',
-                    scoreColor: 'text-orange-600',
-                    borderClass: 'border-orange-500',
-                    factorBreakdown: {
-                        acousticStressScore: 82,
-                        linguisticVulnerabilityScore: 78,
-                        emotionalInstabilityScore: 72
-                    } satisfies SviFactorBreakdown
-                };
-            } else if (count === 3) {
-                return {
-                    svi: 72,
-                    risk: 'HIGH' as const,
-                    confidence: 89,
-                    vulnerabilityDomain: 'Systemic Neglect & Ongoing Vulnerability',
-                    stressLevel: 'Suppressed Desperation & Emotional Fatigue (72%)',
-                    recommendedAction: 'Helpline priority escalation. Prepare multi-agency dispatch.',
-                    badgeClass: 'bg-orange-600 text-white',
-                    scoreColor: 'text-orange-600',
-                    borderClass: 'border-orange-500',
-                    factorBreakdown: {
-                        acousticStressScore: 68,
-                        linguisticVulnerabilityScore: 74,
-                        emotionalInstabilityScore: 75
-                    } satisfies SviFactorBreakdown
-                };
-            } else {
-                return {
-                    svi: 86,
-                    risk: 'CRITICAL' as const,
-                    confidence: 93,
-                    vulnerabilityDomain: 'Active Targeted Violence & Imminent Physical Danger',
-                    stressLevel: 'Critical Vocal Tremor & Severe Agitation (87%)',
-                    recommendedAction: 'Critical Threat Level: Immediate Police Quick Response Team (QRT) Handover Authorized.',
-                    badgeClass: 'bg-red-700 text-white',
-                    scoreColor: 'text-red-700',
-                    borderClass: 'border-red-700',
-                    factorBreakdown: {
-                        acousticStressScore: 88,
-                        linguisticVulnerabilityScore: 87,
-                        emotionalInstabilityScore: 82
+                        acousticStressScore: 0,
+                        linguisticVulnerabilityScore: 0,
+                        emotionalInstabilityScore: 0
                     } satisfies SviFactorBreakdown
                 };
             }
+
+            // Real-time second-by-second progressive interpolation starting from zero
+            let acoustic = 0;
+            let linguistic = 0;
+            let emotional = 0;
+            let confidence = 0;
+            let risk: 'NORMAL' | 'MODERATE' | 'HIGH' | 'CRITICAL' = 'NORMAL';
+            let vulnerabilityDomain = '';
+            let stressLevel = '';
+            let recommendedAction = '';
+            let badgeClass = 'bg-slate-500 text-white';
+            let scoreColor = 'text-slate-600';
+            let borderClass = 'border-slate-300';
+
+            if (sec < 2) {
+                // Initial 0 to 2 seconds: Baseline speech onset
+                const p = sec / 2;
+                acoustic = Math.round(p * 15);
+                linguistic = Math.round(p * 10);
+                emotional = Math.round(p * 8);
+                confidence = Math.round(15 + p * 20);
+                risk = 'NORMAL';
+                vulnerabilityDomain = 'Connecting caller voice channel...';
+                stressLevel = `Calibrating vocal baseline (${acoustic}%)`;
+                recommendedAction = 'Speech onset detected. Monitoring acoustic frequencies.';
+                badgeClass = 'bg-slate-600 text-white';
+                scoreColor = 'text-slate-700';
+                borderClass = 'border-slate-300';
+            } else if (sec < 8) {
+                // Line 1: Caste-based Harassment (sec 2 to 8)
+                const p = (sec - 2) / 6;
+                acoustic = Math.round(15 + p * (46 - 15));
+                linguistic = Math.round(10 + p * (52 - 10));
+                emotional = Math.round(8 + p * (44 - 8));
+                confidence = Math.round(35 + p * (68 - 35));
+                risk = 'MODERATE';
+                vulnerabilityDomain = 'Caste-based Harassment & Discrimination';
+                stressLevel = `Audible Vocal Quiver & Distress Markers (${acoustic}%)`;
+                recommendedAction = 'Log caller location details and assess threat severity.';
+                badgeClass = 'bg-amber-600 text-white';
+                scoreColor = 'text-amber-600';
+                borderClass = 'border-amber-400';
+            } else if (sec < 14) {
+                // Line 2: Physical Assault & Threats to Family (sec 8 to 14)
+                const p = (sec - 8) / 6;
+                acoustic = Math.round(46 + p * (82 - 46));
+                linguistic = Math.round(52 + p * (78 - 52));
+                emotional = Math.round(44 + p * (72 - 44));
+                confidence = Math.round(68 + p * (86 - 68));
+                risk = 'HIGH';
+                vulnerabilityDomain = 'Physical Assault & Direct Threats to Family';
+                stressLevel = `Heightened Pitch & Acute Vocal Tremor (${acoustic}%)`;
+                recommendedAction = 'Active violence & threat detected. Police Control Room handover advised.';
+                badgeClass = 'bg-orange-600 text-white';
+                scoreColor = 'text-orange-600';
+                borderClass = 'border-orange-500';
+            } else if (sec < 19) {
+                // Line 3: Systemic Neglect & Exhaustion (sec 14 to 19)
+                const p = (sec - 14) / 5;
+                acoustic = Math.round(82 + p * (68 - 82));
+                linguistic = Math.round(78 + p * (74 - 78));
+                emotional = Math.round(72 + p * (75 - 72));
+                confidence = Math.round(86 + p * (89 - 86));
+                risk = 'HIGH';
+                vulnerabilityDomain = 'Systemic Neglect & Ongoing Vulnerability';
+                stressLevel = `Suppressed Desperation & Emotional Fatigue (${acoustic}%)`;
+                recommendedAction = 'Helpline priority escalation. Prepare multi-agency dispatch.';
+                badgeClass = 'bg-orange-600 text-white';
+                scoreColor = 'text-orange-600';
+                borderClass = 'border-orange-500';
+            } else {
+                // Line 4 / Final: Acute Retaliation Threat (sec 19 to 24+)
+                const p = Math.min((sec - 19) / 5, 1);
+                acoustic = Math.round(68 + p * (88 - 68));
+                linguistic = Math.round(74 + p * (87 - 74));
+                emotional = Math.round(75 + p * (82 - 75));
+                confidence = Math.round(89 + p * (93 - 89));
+                risk = 'CRITICAL';
+                vulnerabilityDomain = 'Active Targeted Violence & Imminent Physical Danger';
+                stressLevel = `Critical Vocal Tremor & Severe Agitation (${acoustic}%)`;
+                recommendedAction = 'Critical Threat Level: Immediate Police Quick Response Team (QRT) Handover Authorized.';
+                badgeClass = 'bg-red-700 text-white';
+                scoreColor = 'text-red-700';
+                borderClass = 'border-red-700';
+            }
+
+            // Weighted SVI Score (35% Acoustic, 40% Linguistic, 25% Emotional)
+            const svi = Math.round(acoustic * 0.35 + linguistic * 0.40 + emotional * 0.25);
+
+            return {
+                svi,
+                risk,
+                confidence,
+                vulnerabilityDomain,
+                stressLevel,
+                recommendedAction,
+                badgeClass,
+                scoreColor,
+                borderClass,
+                factorBreakdown: {
+                    acousticStressScore: acoustic,
+                    linguisticVulnerabilityScore: linguistic,
+                    emotionalInstabilityScore: emotional
+                } satisfies SviFactorBreakdown
+            };
         } else if (inputMode === 'RECORD_CALL') {
-            if (!micAnalysisComplete) {
+            // MODE 2: Record Current Call via Microphone
+            if (!isMicRecording && !micAnalysisComplete) {
+                // Standby: Exactly zero
                 return {
-                    svi: isMicRecording ? Math.min(Math.round(micRecordDuration * 7), 65) : 0,
-                    risk: isMicRecording ? 'MONITORING' : 'NORMAL',
-                    confidence: isMicRecording ? 45 : 0,
-                    vulnerabilityDomain: isMicRecording ? 'Recording Live Operator/Caller Stream...' : 'Microphone Ready for Input',
-                    stressLevel: isMicRecording ? `Input Energy: ${micAudioLevel}% (Telemetry active)` : 'Awaiting speech recording',
-                    recommendedAction: isMicRecording ? 'Hold line open. Acoustic spectrogram capturing in real time.' : 'Press "Start Call Recording" to ingest station audio.',
-                    badgeClass: isMicRecording ? 'bg-blue-600 text-white' : 'bg-slate-500 text-white',
-                    scoreColor: 'text-blue-900',
-                    borderClass: 'border-blue-300',
+                    svi: 0,
+                    risk: 'STANDBY' as const,
+                    confidence: 0,
+                    vulnerabilityDomain: 'Microphone Standby — Awaiting Recording',
+                    stressLevel: 'Microphone idle (0 dB / 0%)',
+                    recommendedAction: 'Click "Start Recording Call" to ingest live voice stream.',
+                    badgeClass: 'bg-slate-500 text-white',
+                    scoreColor: 'text-slate-600',
+                    borderClass: 'border-slate-300',
                     factorBreakdown: {
-                        acousticStressScore: isMicRecording ? Math.min(micAudioLevel, 85) : 0,
-                        linguisticVulnerabilityScore: isMicRecording ? 30 : 0,
-                        emotionalInstabilityScore: isMicRecording ? 25 : 0
+                        acousticStressScore: 0,
+                        linguisticVulnerabilityScore: 0,
+                        emotionalInstabilityScore: 0
+                    } satisfies SviFactorBreakdown
+                };
+            }
+
+            if (isMicRecording) {
+                // Live recording: Starts at 0 and climbs dynamically as recording progresses!
+                const p = Math.min(micRecordDuration / 16, 1);
+                const acoustic = Math.round(Math.min(micAudioLevel * 0.7 + p * 35, 84));
+                const linguistic = Math.round(p * 81);
+                const emotional = Math.round(p * 76);
+                const svi = Math.round(acoustic * 0.35 + linguistic * 0.40 + emotional * 0.25);
+                const confidence = Math.round(p * 91);
+
+                return {
+                    svi,
+                    risk: svi > 75 ? ('HIGH' as const) : svi > 40 ? ('MODERATE' as const) : ('MONITORING' as const),
+                    confidence,
+                    vulnerabilityDomain: 'Recording Live Speech Audio Stream...',
+                    stressLevel: `Live Acoustic Energy: ${micAudioLevel}% (Telemetry streaming)`,
+                    recommendedAction: 'Hold line open. Acoustic spectrogram updating in real time.',
+                    badgeClass: 'bg-blue-600 text-white',
+                    scoreColor: 'text-blue-900',
+                    borderClass: 'border-blue-400',
+                    factorBreakdown: {
+                        acousticStressScore: acoustic,
+                        linguisticVulnerabilityScore: linguistic,
+                        emotionalInstabilityScore: emotional
                     } satisfies SviFactorBreakdown
                 };
             }
@@ -558,14 +664,15 @@ const VoiceAnalysis: React.FC = () => {
                 } satisfies SviFactorBreakdown
             };
         } else {
-            // UPLOAD_RECORDING MODE
-            if (!uploadedAnalysisDone) {
+            // MODE 3: Upload Pre-recorded Call Recording
+            // If not analyzed or at beginning: Exactly zero!
+            if (!uploadedAnalysisDone && !isUploadedAnalyzing) {
                 return {
                     svi: 0,
-                    risk: 'PENDING' as const,
+                    risk: 'STANDBY' as const,
                     confidence: 0,
-                    vulnerabilityDomain: 'Pre-recorded File Loaded — Awaiting AI Analysis',
-                    stressLevel: 'Spectrogram pending analysis run',
+                    vulnerabilityDomain: 'Pre-recorded File Ready — Not Yet Analyzed',
+                    stressLevel: 'Spectrogram pending analysis run (0%)',
                     recommendedAction: 'Click "Run AI Distress Analysis" to evaluate acoustic, linguistic & emotional indicators.',
                     badgeClass: 'bg-slate-500 text-white',
                     scoreColor: 'text-slate-600',
@@ -578,46 +685,85 @@ const VoiceAnalysis: React.FC = () => {
                 };
             }
 
-            const sc = activeUploadedScenario.assessment;
+            const target = activeUploadedScenario.assessment;
+            const targetAcoustic = target.factorBreakdown.acousticStressScore;
+            const targetLinguistic = target.factorBreakdown.linguisticVulnerabilityScore;
+            const targetEmotional = target.factorBreakdown.emotionalInstabilityScore;
+            const targetSvi = target.svi;
+            const targetConf = target.confidence;
+
+            if (isUploadedAnalyzing) {
+                // Progressively climbs from 0 up to target as analysis ticks
+                const totalSec = activeUploadedScenario.durationSec || 24;
+                const p = Math.min(uploadedAnalysisSeconds / totalSec, 1);
+
+                const acoustic = Math.round(p * targetAcoustic);
+                const linguistic = Math.round(p * targetLinguistic);
+                const emotional = Math.round(p * targetEmotional);
+                const svi = Math.round(acoustic * 0.35 + linguistic * 0.40 + emotional * 0.25);
+                const confidence = Math.round(p * targetConf);
+
+                return {
+                    svi,
+                    risk: svi > 75 ? ('HIGH' as const) : svi > 40 ? ('MODERATE' as const) : ('MONITORING' as const),
+                    confidence,
+                    vulnerabilityDomain: target.vulnerabilityDomain,
+                    stressLevel: `Streaming Audio Analysis... (${Math.round(p * 100)}%)`,
+                    recommendedAction: 'Processing vocal features and calculating dimension weights from zero.',
+                    badgeClass: 'bg-blue-600 text-white',
+                    scoreColor: 'text-blue-900',
+                    borderClass: 'border-blue-400',
+                    factorBreakdown: {
+                        acousticStressScore: acoustic,
+                        linguisticVulnerabilityScore: linguistic,
+                        emotionalInstabilityScore: emotional
+                    } satisfies SviFactorBreakdown
+                };
+            }
+
+            // Completed analysis
             return {
-                svi: sc.svi,
-                risk: sc.risk,
-                confidence: sc.confidence,
-                vulnerabilityDomain: sc.vulnerabilityDomain,
-                stressLevel: sc.stressLevel,
-                recommendedAction: sc.recommendedAction,
+                svi: targetSvi,
+                risk: target.risk,
+                confidence: targetConf,
+                vulnerabilityDomain: target.vulnerabilityDomain,
+                stressLevel: target.stressLevel,
+                recommendedAction: target.recommendedAction,
                 badgeClass:
-                    sc.risk === 'CRITICAL'
+                    target.risk === 'CRITICAL'
                         ? 'bg-red-700 text-white'
-                        : sc.risk === 'HIGH'
+                        : target.risk === 'HIGH'
                         ? 'bg-orange-600 text-white'
-                        : sc.risk === 'MODERATE'
+                        : target.risk === 'MODERATE'
                         ? 'bg-amber-600 text-white'
                         : 'bg-emerald-600 text-white',
                 scoreColor:
-                    sc.risk === 'CRITICAL'
+                    target.risk === 'CRITICAL'
                         ? 'text-red-700'
-                        : sc.risk === 'HIGH'
+                        : target.risk === 'HIGH'
                         ? 'text-orange-600'
-                        : sc.risk === 'MODERATE'
+                        : target.risk === 'MODERATE'
                         ? 'text-amber-600'
                         : 'text-emerald-600',
                 borderClass:
-                    sc.risk === 'CRITICAL'
+                    target.risk === 'CRITICAL'
                         ? 'border-red-700'
-                        : sc.risk === 'HIGH'
+                        : target.risk === 'HIGH'
                         ? 'border-orange-500'
                         : 'border-slate-300',
-                factorBreakdown: sc.factorBreakdown
+                factorBreakdown: target.factorBreakdown
             };
         }
     }, [
         inputMode,
-        displayedLines.length,
+        callStatus,
+        callDuration,
         isMicRecording,
         micRecordDuration,
         micAudioLevel,
         micAnalysisComplete,
+        isUploadedAnalyzing,
+        uploadedAnalysisSeconds,
         uploadedAnalysisDone,
         activeUploadedScenario
     ]);
@@ -927,9 +1073,13 @@ const VoiceAnalysis: React.FC = () => {
                                     <span className="bg-emerald-600 text-white text-[10px] font-bold px-2 py-0.5 rounded font-mono">
                                         TRIAGE COMPLETE
                                     </span>
+                                ) : isUploadedAnalyzing ? (
+                                    <span className="bg-amber-600 text-white text-[10px] font-bold px-2 py-0.5 rounded font-mono animate-pulse">
+                                        ANALYZING STREAM...
+                                    </span>
                                 ) : (
                                     <span className="bg-slate-100 text-slate-700 text-[10px] font-bold px-2 py-0.5 rounded font-mono border border-slate-300">
-                                        AWAITING ANALYSIS
+                                        NOT ANALYZED (SCORES: 0)
                                     </span>
                                 )}
                             </div>
@@ -1019,7 +1169,7 @@ const VoiceAnalysis: React.FC = () => {
                                     <div className="mt-2 p-2.5 bg-amber-50 border border-amber-300 rounded text-xs text-amber-900 space-y-1 animate-pulse">
                                         <div className="flex items-center gap-2 font-bold">
                                             <Activity size={14} className="animate-spin" />
-                                            <span>Processing Audio Telemetry...</span>
+                                            <span>Streaming Audio Telemetry from 0...</span>
                                         </div>
                                         <p className="text-[11px] text-amber-800">{uploadedProgressStep}</p>
                                     </div>
@@ -1030,212 +1180,219 @@ const VoiceAnalysis: React.FC = () => {
 
                     {/* ========================================================= */}
                     {/* PRIMARY AI DISTRESS CLASSIFICATION & SVI DIMENSIONS */}
+                    {/* Always visible: Starts at ZERO and updates during call */}
                     {/* ========================================================= */}
-                    {(callStatus !== 'WAITING' || micAnalysisComplete || uploadedAnalysisDone || inputMode !== 'SIMULATED_LINE') && (
-                        <div className={`bg-white border-2 ${currentAssessment.borderClass} rounded-md p-5 shadow-xs space-y-4 animate-fade-in transition-all duration-300`}>
-                            {/* Header & Risk Tag */}
-                            <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                    <div className={`bg-white border-2 ${currentAssessment.borderClass} rounded-md p-5 shadow-xs space-y-4 animate-fade-in transition-all duration-300`}>
+                        {/* Header & Risk Tag */}
+                        <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                            <div>
                                 <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
                                     <ShieldAlert size={16} className={currentAssessment.risk === 'CRITICAL' ? 'text-red-600' : 'text-amber-600'} />
                                     <span>AI Distress Classification</span>
                                 </h3>
-                                <span className={`${currentAssessment.badgeClass} text-[10px] font-bold px-2.5 py-0.5 rounded font-mono transition-colors duration-300`}>
-                                    {currentAssessment.risk}
-                                </span>
+                                <p className="text-[10px] text-slate-500 font-light mt-0.5">
+                                    {callStatus === 'CONNECTED' || isMicRecording || isUploadedAnalyzing
+                                        ? '● Telemetry Active: Updating as call progresses'
+                                        : 'Telemetry Standby (Starts at 0 on call start)'}
+                                </p>
                             </div>
+                            <span className={`${currentAssessment.badgeClass} text-[10px] font-bold px-2.5 py-0.5 rounded font-mono transition-colors duration-300`}>
+                                {currentAssessment.risk}
+                            </span>
+                        </div>
 
-                            {/* Total SVI Composite Score */}
-                            <div className="bg-slate-50 p-4 rounded border border-slate-200 space-y-3.5">
-                                <div className="flex items-baseline justify-between">
-                                    <div>
-                                        <span className="text-[10px] font-bold uppercase text-slate-500 block tracking-wider">
-                                            Stress & Vulnerability Index (SVI)
-                                        </span>
-                                        <div className="flex items-baseline gap-1 mt-0.5">
-                                            <span className={`text-4xl font-black ${currentAssessment.scoreColor} font-mono transition-colors duration-300`}>
-                                                {currentAssessment.svi}
-                                            </span>
-                                            <span className="text-xs text-slate-500 font-mono font-medium">/ 100</span>
-                                        </div>
-                                    </div>
-                                    <div className="text-right text-xs">
-                                        <span className="text-slate-500 block text-[10px] font-bold uppercase">Confidence</span>
-                                        <span className="font-bold text-slate-900 font-mono text-sm">{currentAssessment.confidence}%</span>
-                                    </div>
-                                </div>
-
-                                {/* ------------------------------------------------------------- */}
-                                {/* SVI DIMENSIONS BREAKDOWN WITH INDIVIDUAL SCORES */}
-                                {/* ------------------------------------------------------------- */}
-                                <div className="pt-3 border-t border-slate-200 space-y-3">
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-800 flex items-center gap-1">
-                                            <Activity size={12} className="text-blue-900" />
-                                            SVI Dimension Breakdown
-                                        </span>
-                                        <span className="text-[9px] font-mono text-slate-500 font-semibold">
-                                            3 Weighted Factors
-                                        </span>
-                                    </div>
-
-                                    {/* Dimension 1: Acoustic Stress */}
-                                    <div className="space-y-1">
-                                        <div className="flex items-center justify-between text-xs">
-                                            <span className="text-slate-700 font-semibold flex items-center gap-1.5 text-[11px]">
-                                                <Volume2 size={12} className="text-blue-800 shrink-0" />
-                                                Acoustic Stress <span className="text-slate-400 font-mono text-[10px] font-normal">(35% Wt)</span>
-                                            </span>
-                                            <span className="font-mono font-bold text-slate-900 text-xs">
-                                                {currentAssessment.factorBreakdown.acousticStressScore} <span className="text-slate-400 text-[10px]">/ 100</span>
-                                            </span>
-                                        </div>
-                                        <div className="h-2 w-full bg-slate-200 rounded-full overflow-hidden">
-                                            <div
-                                                className="h-full bg-blue-800 rounded-full transition-all duration-500 ease-out"
-                                                style={{ width: `${Math.min(currentAssessment.factorBreakdown.acousticStressScore, 100)}%` }}
-                                            />
-                                        </div>
-                                    </div>
-
-                                    {/* Dimension 2: Linguistic Vulnerability */}
-                                    <div className="space-y-1">
-                                        <div className="flex items-center justify-between text-xs">
-                                            <span className="text-slate-700 font-semibold flex items-center gap-1.5 text-[11px]">
-                                                <MessageSquare size={12} className="text-amber-600 shrink-0" />
-                                                Linguistic Vulnerability <span className="text-slate-400 font-mono text-[10px] font-normal">(40% Wt)</span>
-                                            </span>
-                                            <span className="font-mono font-bold text-slate-900 text-xs">
-                                                {currentAssessment.factorBreakdown.linguisticVulnerabilityScore} <span className="text-slate-400 text-[10px]">/ 100</span>
-                                            </span>
-                                        </div>
-                                        <div className="h-2 w-full bg-slate-200 rounded-full overflow-hidden">
-                                            <div
-                                                className="h-full bg-amber-600 rounded-full transition-all duration-500 ease-out"
-                                                style={{ width: `${Math.min(currentAssessment.factorBreakdown.linguisticVulnerabilityScore, 100)}%` }}
-                                            />
-                                        </div>
-                                    </div>
-
-                                    {/* Dimension 3: Emotional Instability */}
-                                    <div className="space-y-1">
-                                        <div className="flex items-center justify-between text-xs">
-                                            <span className="text-slate-700 font-semibold flex items-center gap-1.5 text-[11px]">
-                                                <Heart size={12} className="text-rose-600 shrink-0" />
-                                                Emotional Instability <span className="text-slate-400 font-mono text-[10px] font-normal">(25% Wt)</span>
-                                            </span>
-                                            <span className="font-mono font-bold text-slate-900 text-xs">
-                                                {currentAssessment.factorBreakdown.emotionalInstabilityScore} <span className="text-slate-400 text-[10px]">/ 100</span>
-                                            </span>
-                                        </div>
-                                        <div className="h-2 w-full bg-slate-200 rounded-full overflow-hidden">
-                                            <div
-                                                className="h-full bg-rose-600 rounded-full transition-all duration-500 ease-out"
-                                                style={{ width: `${Math.min(currentAssessment.factorBreakdown.emotionalInstabilityScore, 100)}%` }}
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Risk Details */}
-                            <div className="space-y-2.5 text-xs">
+                        {/* Total SVI Composite Score */}
+                        <div className="bg-slate-50 p-4 rounded border border-slate-200 space-y-3.5">
+                            <div className="flex items-baseline justify-between">
                                 <div>
-                                    <span className="text-[10px] font-bold text-slate-500 uppercase block">Identified Vulnerability Domain:</span>
-                                    <p className="font-bold text-slate-900 text-xs mt-0.5">
-                                        {currentAssessment.vulnerabilityDomain}
-                                    </p>
-                                </div>
-
-                                <div>
-                                    <span className="text-[10px] font-bold text-slate-500 uppercase block">Acoustic Stress Telemetry:</span>
-                                    <p className="text-slate-700 font-medium text-xs mt-0.5">
-                                        {currentAssessment.stressLevel}
-                                    </p>
-                                </div>
-
-                                <div className="border-t border-slate-200 pt-2">
-                                    <span className={`text-[10px] font-bold uppercase block ${currentAssessment.risk === 'CRITICAL' ? 'text-red-700' : 'text-slate-700'}`}>Recommended Action:</span>
-                                    <p className="text-xs text-slate-800 font-medium mt-0.5 leading-snug">
-                                        {currentAssessment.recommendedAction}
-                                    </p>
-                                </div>
-                            </div>
-
-                            {/* Department Escalation & Handover Module */}
-                            <div className="border-t border-slate-200 pt-3 space-y-3">
-                                <div className="flex items-center justify-between">
-                                    <span className="text-[11px] font-bold uppercase tracking-wide text-slate-700 flex items-center gap-1.5">
-                                        <Building2 size={13} className="text-blue-900" />
-                                        Department Escalation Handover
+                                    <span className="text-[10px] font-bold uppercase text-slate-500 block tracking-wider">
+                                        Stress & Vulnerability Index (SVI)
                                     </span>
-                                    {isEscalationAvailable && (
-                                        <span className="text-[10px] font-mono text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.2 rounded font-bold">
-                                            HANDOVER READY
+                                    <div className="flex items-baseline gap-1 mt-0.5">
+                                        <span className={`text-4xl font-black ${currentAssessment.scoreColor} font-mono transition-colors duration-300`}>
+                                            {currentAssessment.svi}
                                         </span>
-                                    )}
+                                        <span className="text-xs text-slate-500 font-mono font-medium">/ 100</span>
+                                    </div>
+                                </div>
+                                <div className="text-right text-xs">
+                                    <span className="text-slate-500 block text-[10px] font-bold uppercase">Confidence</span>
+                                    <span className="font-bold text-slate-900 font-mono text-sm">{currentAssessment.confidence}%</span>
+                                </div>
+                            </div>
+
+                            {/* ------------------------------------------------------------- */}
+                            {/* SVI DIMENSIONS BREAKDOWN WITH INDIVIDUAL SCORES */}
+                            {/* Starts at 0 / 100 and updates dynamically */}
+                            {/* ------------------------------------------------------------- */}
+                            <div className="pt-3 border-t border-slate-200 space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-800 flex items-center gap-1">
+                                        <Activity size={12} className="text-blue-900" />
+                                        SVI Dimension Breakdown
+                                    </span>
+                                    <span className="text-[9px] font-mono text-slate-500 font-semibold">
+                                        3 Weighted Factors
+                                    </span>
                                 </div>
 
-                                {!isEscalationAvailable ? (
-                                    <div className="p-2.5 bg-slate-50 border border-slate-200 rounded text-[11px] text-slate-500 font-light">
-                                        Escalation protocols activate when SVI reaches Moderate/High (≥ 48) or once call concludes.
+                                {/* Dimension 1: Acoustic Stress */}
+                                <div className="space-y-1">
+                                    <div className="flex items-center justify-between text-xs">
+                                        <span className="text-slate-700 font-semibold flex items-center gap-1.5 text-[11px]">
+                                            <Volume2 size={12} className="text-blue-800 shrink-0" />
+                                            Acoustic Stress <span className="text-slate-400 font-mono text-[10px] font-normal">(35% Wt)</span>
+                                        </span>
+                                        <span className="font-mono font-bold text-slate-900 text-xs">
+                                            {currentAssessment.factorBreakdown.acousticStressScore} <span className="text-slate-400 text-[10px]">/ 100</span>
+                                        </span>
                                     </div>
-                                ) : !escalated ? (
-                                    <div className="space-y-2.5">
-                                        <div>
-                                            <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                                                Select Intervention Department:
-                                            </label>
-                                            <select
-                                                value={selectedDepartment}
-                                                onChange={(e) => setSelectedDepartment(e.target.value)}
-                                                className="w-full text-xs p-2 bg-slate-50 border border-slate-300 rounded text-slate-900 font-medium focus:bg-white focus:border-blue-900 outline-none cursor-pointer"
-                                            >
-                                                {EMERGENCY_DEPARTMENTS.map((dept) => (
-                                                    <option key={dept.id} value={dept.name}>
-                                                        {dept.name}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                            <p className="text-[10px] text-slate-500 italic mt-1">
-                                                * Direct handover routes call transcript & SVI metrics to the department quick response unit.
-                                            </p>
-                                        </div>
+                                    <div className="h-2 w-full bg-slate-200 rounded-full overflow-hidden">
+                                        <div
+                                            className="h-full bg-blue-800 rounded-full transition-all duration-300 ease-out"
+                                            style={{ width: `${Math.min(currentAssessment.factorBreakdown.acousticStressScore, 100)}%` }}
+                                        />
+                                    </div>
+                                </div>
 
-                                        <button
-                                            onClick={handleEscalateCall}
-                                            className="w-full bg-red-700 hover:bg-red-800 text-white font-bold py-2.5 px-3 rounded text-xs uppercase flex items-center justify-center gap-2 shadow-xs cursor-pointer transition-colors"
-                                        >
-                                            <Siren size={15} />
-                                            <span>Hand Over Call to {selectedDepartment.split('(')[0]}</span>
-                                            <ArrowUpRight size={14} />
-                                        </button>
+                                {/* Dimension 2: Linguistic Vulnerability */}
+                                <div className="space-y-1">
+                                    <div className="flex items-center justify-between text-xs">
+                                        <span className="text-slate-700 font-semibold flex items-center gap-1.5 text-[11px]">
+                                            <MessageSquare size={12} className="text-amber-600 shrink-0" />
+                                            Linguistic Vulnerability <span className="text-slate-400 font-mono text-[10px] font-normal">(40% Wt)</span>
+                                        </span>
+                                        <span className="font-mono font-bold text-slate-900 text-xs">
+                                            {currentAssessment.factorBreakdown.linguisticVulnerabilityScore} <span className="text-slate-400 text-[10px]">/ 100</span>
+                                        </span>
                                     </div>
-                                ) : (
-                                    <div className="bg-emerald-50 border border-emerald-400 rounded-md p-3 text-xs space-y-1.5 animate-fade-in">
-                                        <div className="flex items-center justify-between">
-                                            <span className="font-bold text-emerald-900 flex items-center gap-1.5">
-                                                <CheckCircle2 size={16} className="text-emerald-700" />
-                                                Call Escalated & Handed Over
-                                            </span>
-                                            <span className="bg-emerald-700 text-white font-mono text-[9px] font-bold px-1.5 py-0.5 rounded">
-                                                DISPATCH NOTIFIED
-                                            </span>
-                                        </div>
-                                        <p className="text-emerald-950 font-semibold text-[11px]">
-                                            Department: <span className="underline">{escalationDocket?.department}</span>
-                                        </p>
-                                        <div className="text-[10px] font-mono text-emerald-800 space-y-0.5 pt-1 border-t border-emerald-200">
-                                            <div>Transfer Docket: <strong>{escalationDocket?.docketId}</strong></div>
-                                            <div>Duty Officer: <strong>Priya Sharma (OP-0482)</strong> at {escalationDocket?.timestamp}</div>
-                                            <div className="text-emerald-900 font-sans font-medium mt-1">
-                                                ✓ Audio recording & real-time telemetry forwarded to Police QRT mobile unit.
-                                            </div>
-                                        </div>
+                                    <div className="h-2 w-full bg-slate-200 rounded-full overflow-hidden">
+                                        <div
+                                            className="h-full bg-amber-600 rounded-full transition-all duration-300 ease-out"
+                                            style={{ width: `${Math.min(currentAssessment.factorBreakdown.linguisticVulnerabilityScore, 100)}%` }}
+                                        />
                                     </div>
-                                )}
+                                </div>
+
+                                {/* Dimension 3: Emotional Instability */}
+                                <div className="space-y-1">
+                                    <div className="flex items-center justify-between text-xs">
+                                        <span className="text-slate-700 font-semibold flex items-center gap-1.5 text-[11px]">
+                                            <Heart size={12} className="text-rose-600 shrink-0" />
+                                            Emotional Instability <span className="text-slate-400 font-mono text-[10px] font-normal">(25% Wt)</span>
+                                        </span>
+                                        <span className="font-mono font-bold text-slate-900 text-xs">
+                                            {currentAssessment.factorBreakdown.emotionalInstabilityScore} <span className="text-slate-400 text-[10px]">/ 100</span>
+                                        </span>
+                                    </div>
+                                    <div className="h-2 w-full bg-slate-200 rounded-full overflow-hidden">
+                                        <div
+                                            className="h-full bg-rose-600 rounded-full transition-all duration-300 ease-out"
+                                            style={{ width: `${Math.min(currentAssessment.factorBreakdown.emotionalInstabilityScore, 100)}%` }}
+                                        />
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                    )}
+
+                        {/* Risk Details */}
+                        <div className="space-y-2.5 text-xs">
+                            <div>
+                                <span className="text-[10px] font-bold text-slate-500 uppercase block">Identified Vulnerability Domain:</span>
+                                <p className="font-bold text-slate-900 text-xs mt-0.5">
+                                    {currentAssessment.vulnerabilityDomain}
+                                </p>
+                            </div>
+
+                            <div>
+                                <span className="text-[10px] font-bold text-slate-500 uppercase block">Acoustic Stress Telemetry:</span>
+                                <p className="text-slate-700 font-medium text-xs mt-0.5">
+                                    {currentAssessment.stressLevel}
+                                </p>
+                            </div>
+
+                            <div className="border-t border-slate-200 pt-2">
+                                <span className={`text-[10px] font-bold uppercase block ${currentAssessment.risk === 'CRITICAL' ? 'text-red-700' : 'text-slate-700'}`}>Recommended Action:</span>
+                                <p className="text-xs text-slate-800 font-medium mt-0.5 leading-snug">
+                                    {currentAssessment.recommendedAction}
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Department Escalation & Handover Module */}
+                        <div className="border-t border-slate-200 pt-3 space-y-3">
+                            <div className="flex items-center justify-between">
+                                <span className="text-[11px] font-bold uppercase tracking-wide text-slate-700 flex items-center gap-1.5">
+                                    <Building2 size={13} className="text-blue-900" />
+                                    Department Escalation Handover
+                                </span>
+                                {isEscalationAvailable && (
+                                    <span className="text-[10px] font-mono text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.2 rounded font-bold">
+                                        HANDOVER READY
+                                    </span>
+                                )}
+                            </div>
+
+                            {!isEscalationAvailable ? (
+                                <div className="p-2.5 bg-slate-50 border border-slate-200 rounded text-[11px] text-slate-500 font-light">
+                                    Escalation protocols activate as caller speech reaches Moderate/High (≥ 48 SVI) or once call concludes.
+                                </div>
+                            ) : !escalated ? (
+                                <div className="space-y-2.5">
+                                    <div>
+                                        <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                                            Select Intervention Department:
+                                        </label>
+                                        <select
+                                            value={selectedDepartment}
+                                            onChange={(e) => setSelectedDepartment(e.target.value)}
+                                            className="w-full text-xs p-2 bg-slate-50 border border-slate-300 rounded text-slate-900 font-medium focus:bg-white focus:border-blue-900 outline-none cursor-pointer"
+                                        >
+                                            {EMERGENCY_DEPARTMENTS.map((dept) => (
+                                                <option key={dept.id} value={dept.name}>
+                                                    {dept.name}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        <p className="text-[10px] text-slate-500 italic mt-1">
+                                            * Direct handover routes call transcript & SVI metrics to the department quick response unit.
+                                        </p>
+                                    </div>
+
+                                    <button
+                                        onClick={handleEscalateCall}
+                                        className="w-full bg-red-700 hover:bg-red-800 text-white font-bold py-2.5 px-3 rounded text-xs uppercase flex items-center justify-center gap-2 shadow-xs cursor-pointer transition-colors"
+                                    >
+                                        <Siren size={15} />
+                                        <span>Hand Over Call to {selectedDepartment.split('(')[0]}</span>
+                                        <ArrowUpRight size={14} />
+                                    </button>
+                                </div>
+                            ) : (
+                                <div className="bg-emerald-50 border border-emerald-400 rounded-md p-3 text-xs space-y-1.5 animate-fade-in">
+                                    <div className="flex items-center justify-between">
+                                        <span className="font-bold text-emerald-900 flex items-center gap-1.5">
+                                            <CheckCircle2 size={16} className="text-emerald-700" />
+                                            Call Escalated & Handed Over
+                                        </span>
+                                        <span className="bg-emerald-700 text-white font-mono text-[9px] font-bold px-1.5 py-0.5 rounded">
+                                            DISPATCH NOTIFIED
+                                        </span>
+                                    </div>
+                                    <p className="text-emerald-950 font-semibold text-[11px]">
+                                        Department: <span className="underline">{escalationDocket?.department}</span>
+                                    </p>
+                                    <div className="text-[10px] font-mono text-emerald-800 space-y-0.5 pt-1 border-t border-emerald-200">
+                                        <div>Transfer Docket: <strong>{escalationDocket?.docketId}</strong></div>
+                                        <div>Duty Officer: <strong>Priya Sharma (OP-0482)</strong> at {escalationDocket?.timestamp}</div>
+                                        <div className="text-emerald-900 font-sans font-medium mt-1">
+                                            ✓ Audio recording & real-time telemetry forwarded to Police QRT mobile unit.
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
                 </div>
 
                 {/* RIGHT SIDE (7/12): Live Transcript & Dialogue Evidence */}
@@ -1289,7 +1446,7 @@ const VoiceAnalysis: React.FC = () => {
                                 <div className="h-full flex flex-col items-center justify-center text-center p-8 text-slate-400 animate-pulse">
                                     <Radio size={36} className="text-blue-900 mb-2 animate-spin" />
                                     <p className="text-xs font-semibold text-slate-700">Connecting audio telemetry stream...</p>
-                                    <p className="text-[11px] text-slate-400 mt-1">Calibrating acoustic noise filters</p>
+                                    <p className="text-[11px] text-slate-400 mt-1">Calibrating acoustic noise filters from 0</p>
                                 </div>
                             )}
 
@@ -1339,7 +1496,7 @@ const VoiceAnalysis: React.FC = () => {
                             {inputMode === 'SIMULATED_LINE' && callStatus === 'CONNECTED' && (
                                 <div className="flex items-center gap-2 p-2.5 text-xs font-mono text-slate-600 bg-slate-50 rounded border border-slate-200 animate-pulse">
                                     <span className="w-2 h-2 rounded-full bg-emerald-600" />
-                                    <span>Caller voice stream live • Transcribing audio in real time...</span>
+                                    <span>Caller voice stream live • Transcribing audio & updating dimension scores...</span>
                                 </div>
                             )}
 
@@ -1351,7 +1508,7 @@ const VoiceAnalysis: React.FC = () => {
                                         Microphone Station Ready
                                     </p>
                                     <p className="text-xs text-slate-500 mt-1 max-w-sm font-light leading-relaxed">
-                                        Press <strong>"Start Recording Call"</strong> on the left to capture live caller/operator voice input directly from your microphone.
+                                        Press <strong>"Start Recording Call"</strong> on the left to capture live caller/operator voice input directly from your microphone. All scores start at 0.
                                     </p>
                                 </div>
                             )}
@@ -1366,7 +1523,7 @@ const VoiceAnalysis: React.FC = () => {
                                         Recording Call Audio In Real Time
                                     </p>
                                     <p className="text-xs text-slate-500 max-w-md font-light">
-                                        Audio wave samples are being buffered and analyzed. Press "Stop & Analyze Call Recording" when the call completes.
+                                        Audio wave samples are being buffered and analyzed. SVI dimensions are climbing from zero as speech is detected.
                                     </p>
                                     <div className="text-sm font-mono font-bold text-red-700 bg-red-50 border border-red-200 px-3 py-1 rounded-full">
                                         REC TIME: {formatTimer(micRecordDuration)}
@@ -1424,11 +1581,11 @@ const VoiceAnalysis: React.FC = () => {
                                 <div className="h-full flex flex-col items-center justify-center text-center p-8 text-slate-400">
                                     <FolderUp size={44} className="stroke-[1.3] mb-3 text-slate-300" />
                                     <p className="text-base font-bold text-slate-800">
-                                        Pre-Recorded Audio File Ready
+                                        Pre-Recorded Audio File Loaded (Scores: 0)
                                     </p>
                                     <p className="text-xs text-slate-500 mt-1 max-w-sm font-light leading-relaxed">
                                         Audio recording: <strong>{uploadedFileMeta?.name}</strong>.
-                                        Click <strong>"Run AI Distress Analysis"</strong> on the left to extract vocal acoustics, transcribe dialogue, and compute SVI dimension weights.
+                                        Click <strong>"Run AI Distress Analysis"</strong> on the left to start telemetry stream from zero.
                                     </p>
                                 </div>
                             )}
