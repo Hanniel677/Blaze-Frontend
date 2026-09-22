@@ -1,6 +1,6 @@
 import React from 'react';
 import type { CaseAssessment } from '../types';
-import { Printer, X, Shield, Activity, FileText } from 'lucide-react';
+import { Printer, X, Shield, Activity, FileText, MessageSquare, Heart } from 'lucide-react';
 
 interface ReportModalProps {
     assessment: CaseAssessment;
@@ -25,58 +25,55 @@ const ReportModal: React.FC<ReportModalProps> = ({ assessment, onClose }) => {
                     <div className="flex items-center gap-2">
                         <button
                             onClick={handlePrint}
-                            className="bg-zinc-900 hover:bg-black text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-colors cursor-pointer shadow-sm"
+                            className="flex items-center gap-1.5 px-4 py-2 bg-zinc-900 text-white rounded-xl text-xs font-bold hover:bg-zinc-800 transition cursor-pointer shadow-xs"
                         >
                             <Printer size={14} />
-                            <span>Print / Export PDF</span>
+                            <span>Export / Print</span>
                         </button>
 
                         <button
                             onClick={onClose}
-                            className="w-8 h-8 rounded-full bg-zinc-100 hover:bg-zinc-200 text-zinc-600 flex items-center justify-center transition-colors cursor-pointer"
+                            className="p-2 text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 rounded-xl transition cursor-pointer"
                         >
-                            <X size={16} />
+                            <X size={18} />
                         </button>
                     </div>
                 </div>
 
-                {/* Printable Document Body */}
-                <div className="space-y-6 print:space-y-4">
-                    {/* Official Document Header */}
-                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 border-b-2 border-zinc-900 pb-4">
+                {/* Printable Report Canvas */}
+                <div className="space-y-6 printable-area">
+                    {/* Header */}
+                    <div className="border-b-2 border-zinc-900 pb-5 flex justify-between items-start">
                         <div>
-                            <div className="flex items-center gap-2">
-                                <div className="w-7 h-7 rounded-lg bg-zinc-900 flex items-center justify-center text-[var(--color-accent-lime)]">
-                                    <Activity size={16} />
-                                </div>
-                                <h2 className="font-display font-bold text-xl tracking-tight text-zinc-950">
-                                    SAHAAYA AI HELPLINE
-                                </h2>
-                            </div>
-                            <p className="text-[10px] uppercase font-mono tracking-widest text-zinc-500 mt-1">
-                                Real-Time Voice Stress & Vulnerability Assessment Report
+                            <span className="text-[10px] font-mono tracking-widest text-zinc-400 uppercase font-bold">
+                                National Emergency Helpline 112 / ERSS
+                            </span>
+                            <h2 className="font-display font-medium text-2xl text-zinc-950 mt-1">
+                                AI Forensic Distress Classification Summary
+                            </h2>
+                            <p className="text-xs text-zinc-500 mt-1 font-mono">
+                                CASE ID: <strong>{assessment.id}</strong> | CALL DURATION: {assessment.duration} | DIALECT: {assessment.language}
                             </p>
                         </div>
-
-                        <div className="text-right font-mono text-xs text-zinc-600">
-                            <p className="font-bold text-zinc-900 text-sm">CASE #{assessment.id}</p>
-                            <p className="text-[10px] text-zinc-400 mt-0.5">GENERATED: {new Date().toLocaleString()}</p>
-                            <p className="text-[10px] text-emerald-700 font-bold">STATUS: {assessment.status}</p>
+                        <div className="text-right">
+                            <span className="px-3 py-1 bg-zinc-900 text-white font-mono text-xs font-bold rounded-lg uppercase">
+                                STATUS: {assessment.status}
+                            </span>
                         </div>
                     </div>
 
-                    {/* Metadata Summary Grid */}
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-zinc-50 p-4 rounded-2xl border border-zinc-200/80 text-xs">
+                    {/* Meta Overview Strip */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-4 bg-zinc-50 rounded-2xl border border-zinc-200 text-xs">
                         <div>
-                            <span className="text-[10px] uppercase font-bold text-zinc-400 block">Dialect & Regional Code</span>
-                            <span className="font-bold text-zinc-900">{assessment.language}</span>
+                            <span className="text-[10px] uppercase font-bold text-zinc-400 block">Incident Date</span>
+                            <span className="font-mono text-zinc-700">{assessment.date || 'Today'}</span>
                         </div>
                         <div>
-                            <span className="text-[10px] uppercase font-bold text-zinc-400 block">Interaction Length</span>
-                            <span className="font-bold text-zinc-900">{assessment.duration}</span>
+                            <span className="text-[10px] uppercase font-bold text-zinc-400 block">Location Zone</span>
+                            <span className="font-mono text-zinc-700">{assessment.locationMasked || 'North Sector'}</span>
                         </div>
                         <div>
-                            <span className="text-[10px] uppercase font-bold text-zinc-400 block">Caller Terminal ID</span>
+                            <span className="text-[10px] uppercase font-bold text-zinc-400 block">Caller Phone ID</span>
                             <span className="font-mono text-zinc-700">{assessment.callerIdMasked || '+91-PROTECTED'}</span>
                         </div>
                         <div>
@@ -86,29 +83,95 @@ const ReportModal: React.FC<ReportModalProps> = ({ assessment, onClose }) => {
                     </div>
 
                     {/* Primary Classification & SVI Box */}
-                    <div className="border-2 border-zinc-900 p-5 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white">
-                        <div>
-                            <span className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider">
-                                Triaged Risk Category
-                            </span>
-                            <div className="flex items-center gap-3 mt-1">
-                                <span className="text-2xl font-black font-display text-zinc-950">
-                                    {assessment.risk} RISK
+                    <div className="border-2 border-zinc-900 p-5 rounded-2xl space-y-4 bg-white">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                            <div>
+                                <span className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider">
+                                    Triaged Risk Category
                                 </span>
-                                <span className="text-xs font-mono font-bold bg-zinc-100 px-2.5 py-1 rounded-full border border-zinc-300">
-                                    CONFIDENCE: {assessment.confidence}%
+                                <div className="flex items-center gap-3 mt-1">
+                                    <span className="text-2xl font-black font-display text-zinc-950">
+                                        {assessment.risk} RISK
+                                    </span>
+                                    <span className="text-xs font-mono font-bold bg-zinc-100 px-2.5 py-1 rounded-full border border-zinc-300">
+                                        CONFIDENCE: {assessment.confidence}%
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div className="text-right sm:border-l sm:border-zinc-200 sm:pl-6">
+                                <span className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider">
+                                    Stress & Vulnerability Index
                                 </span>
+                                <p className="font-display font-black text-4xl text-zinc-950">
+                                    {assessment.svi} <span className="text-sm font-normal text-zinc-500 font-mono">/100</span>
+                                </p>
                             </div>
                         </div>
 
-                        <div className="text-right sm:border-l sm:border-zinc-200 sm:pl-6">
-                            <span className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider">
-                                Stress & Vulnerability Index
-                            </span>
-                            <p className="font-display font-black text-4xl text-zinc-950">
-                                {assessment.svi} <span className="text-sm font-normal text-zinc-500 font-mono">/100</span>
-                            </p>
-                        </div>
+                        {/* SVI Dimension Breakdown */}
+                        {assessment.factorBreakdown && (
+                            <div className="pt-3 border-t border-zinc-200">
+                                <span className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider block mb-2">
+                                    SVI Dimension Scores (3 Weighted Axes)
+                                </span>
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                    <div className="p-3 bg-zinc-50 border border-zinc-200 rounded-xl space-y-1.5">
+                                        <div className="flex justify-between items-center text-xs">
+                                            <span className="font-medium text-zinc-700 flex items-center gap-1">
+                                                <Activity size={12} className="text-zinc-600" />
+                                                Acoustic (35%)
+                                            </span>
+                                            <span className="font-mono font-bold text-zinc-900">
+                                                {assessment.factorBreakdown.acousticStressScore}/100
+                                            </span>
+                                        </div>
+                                        <div className="h-1.5 w-full bg-zinc-200 rounded-full overflow-hidden">
+                                            <div
+                                                className="h-full bg-zinc-900 rounded-full"
+                                                style={{ width: `${Math.min(assessment.factorBreakdown.acousticStressScore, 100)}%` }}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="p-3 bg-zinc-50 border border-zinc-200 rounded-xl space-y-1.5">
+                                        <div className="flex justify-between items-center text-xs">
+                                            <span className="font-medium text-zinc-700 flex items-center gap-1">
+                                                <MessageSquare size={12} className="text-amber-600" />
+                                                Linguistic (40%)
+                                            </span>
+                                            <span className="font-mono font-bold text-zinc-900">
+                                                {assessment.factorBreakdown.linguisticVulnerabilityScore}/100
+                                            </span>
+                                        </div>
+                                        <div className="h-1.5 w-full bg-zinc-200 rounded-full overflow-hidden">
+                                            <div
+                                                className="h-full bg-amber-500 rounded-full"
+                                                style={{ width: `${Math.min(assessment.factorBreakdown.linguisticVulnerabilityScore, 100)}%` }}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="p-3 bg-zinc-50 border border-zinc-200 rounded-xl space-y-1.5">
+                                        <div className="flex justify-between items-center text-xs">
+                                            <span className="font-medium text-zinc-700 flex items-center gap-1">
+                                                <Heart size={12} className="text-rose-600" />
+                                                Emotional (25%)
+                                            </span>
+                                            <span className="font-mono font-bold text-zinc-900">
+                                                {assessment.factorBreakdown.emotionalInstabilityScore}/100
+                                            </span>
+                                        </div>
+                                        <div className="h-1.5 w-full bg-zinc-200 rounded-full overflow-hidden">
+                                            <div
+                                                className="h-full bg-rose-500 rounded-full"
+                                                style={{ width: `${Math.min(assessment.factorBreakdown.emotionalInstabilityScore, 100)}%` }}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     {/* Speech Acoustics & Emotions Grid */}
