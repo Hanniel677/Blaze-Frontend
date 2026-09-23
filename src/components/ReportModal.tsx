@@ -1,6 +1,8 @@
 import React from 'react';
 import type { CaseAssessment } from '../types';
-import { Printer, X, Shield, Activity, FileText, MessageSquare, Heart } from 'lucide-react';
+import { Printer, X, Shield, Activity, FileText, MessageSquare, Heart, Download } from 'lucide-react';
+import { generateEmergencyIncidentPdf } from '../services/pdfReportGenerator';
+import { OFFICIAL_CALLER_SCENARIO } from '../data/demoScript';
 
 interface ReportModalProps {
     assessment: CaseAssessment;
@@ -10,6 +12,35 @@ interface ReportModalProps {
 const ReportModal: React.FC<ReportModalProps> = ({ assessment, onClose }) => {
     const handlePrint = () => {
         window.print();
+    };
+
+    const handleDownloadPdf = () => {
+        const transcriptLines = (assessment.transcript || []).map((t, idx) => ({
+            id: `line-${idx}`,
+            secondOffset: idx * 5,
+            text: t.text,
+            englishTranslation: t.translatedText || '',
+            indicatorTag: t.indicator?.label || '',
+            severity: (t.indicator?.severity === 'HIGH' ? 'CRITICAL' : t.indicator?.severity === 'MEDIUM' ? 'HIGH' : 'MEDIUM') as 'CRITICAL' | 'HIGH' | 'MEDIUM'
+        }));
+
+        generateEmergencyIncidentPdf({
+            callId: assessment.id,
+            callerNumber: assessment.callerIdMasked || '+91-PROTECTED',
+            callerLocation: assessment.locationMasked || 'Emergency Jurisdiction Sector',
+            dialect: assessment.language,
+            durationFormatted: assessment.duration,
+            assessment: {
+                svi: assessment.svi,
+                risk: assessment.risk,
+                confidence: assessment.confidence,
+                vulnerabilityDomain: assessment.vulnerabilities?.[0]?.label || 'Active Vocal & Situational Vulnerability',
+                stressLevel: assessment.speechMetrics?.emotionalSignal || 'Acoustic Distress Signature Detected',
+                recommendedAction: assessment.operatorReview?.notes || 'Standard triage intervention protocol: Immediate review and emergency department dispatch authorized.'
+            },
+            lines: transcriptLines.length > 0 ? transcriptLines : OFFICIAL_CALLER_SCENARIO.lines,
+            dutyOfficer: assessment.operatorReview?.reviewedBy || 'Priya Sharma (OP-0482)'
+        });
     };
 
     return (
@@ -23,6 +54,14 @@ const ReportModal: React.FC<ReportModalProps> = ({ assessment, onClose }) => {
                     </div>
 
                     <div className="flex items-center gap-2">
+                        <button
+                            onClick={handleDownloadPdf}
+                            className="flex items-center gap-1.5 px-3.5 py-2 bg-blue-900 text-white rounded-xl text-xs font-bold hover:bg-blue-950 transition cursor-pointer shadow-xs"
+                        >
+                            <Download size={14} />
+                            <span>Download PDF</span>
+                        </button>
+
                         <button
                             onClick={handlePrint}
                             className="flex items-center gap-1.5 px-4 py-2 bg-zinc-900 text-white rounded-xl text-xs font-bold hover:bg-zinc-800 transition cursor-pointer shadow-xs"

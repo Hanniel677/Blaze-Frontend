@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import {
     Search,
     Download,
-    ArrowRight
+    ArrowRight,
+    Trash2
 } from 'lucide-react';
 import { OFFICIAL_CALLER_SCENARIO } from '../data/demoScript';
 
@@ -15,7 +16,7 @@ interface CallRecord {
     duration: string;
     svi: number;
     risk: 'LOW' | 'MODERATE' | 'HIGH' | 'CRITICAL';
-    status: 'DISPATCHED' | 'VERIFIED' | 'MONITORING';
+    status: 'DISPATCHED' | 'RESOLVED' | 'MONITORING';
     callerMasked: string;
 }
 
@@ -39,7 +40,7 @@ const INITIAL_CALLS: CallRecord[] = [
         duration: '06:18',
         svi: 64,
         risk: 'HIGH',
-        status: 'VERIFIED',
+        status: 'RESOLVED',
         callerMasked: '+91 94XXX-XX874'
     },
     {
@@ -72,7 +73,7 @@ const INITIAL_CALLS: CallRecord[] = [
         duration: '02:15',
         svi: 14,
         risk: 'LOW',
-        status: 'VERIFIED',
+        status: 'RESOLVED',
         callerMasked: '+91 96XXX-XX905'
     }
 ];
@@ -261,6 +262,16 @@ const Dashboard: React.FC = () => {
                                             <span className="text-red-700 font-bold bg-red-50 border border-red-200 px-2 py-0.5 rounded text-[10px]">
                                                 QRT Dispatched
                                             </span>
+                                        ) : item.status === 'RESOLVED' ? (
+                                            <div className="flex flex-col items-center">
+                                                <span className="text-emerald-700 font-bold bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded text-[10px]">
+                                                    Resolved
+                                                </span>
+                                                <span className="text-[10px] text-slate-400 mt-1 italic leading-tight text-center max-w-[155px] flex items-center justify-center gap-1">
+                                                    <Trash2 size={10} className="shrink-0 text-slate-400" />
+                                                    <span>This incident info will be auto deleted in 30 days</span>
+                                                </span>
+                                            </div>
                                         ) : (
                                             <span className="text-slate-600 text-[10px]">
                                                 {item.status}

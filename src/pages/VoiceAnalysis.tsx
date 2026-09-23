@@ -7,17 +7,19 @@ import {
     RotateCcw,
     Siren,
     Radio,
-    FileText,
     MapPin,
     User,
     ArrowUpRight,
     Building2,
-    Shield,
-    Activity,
     AlertOctagon,
-    Clock
+    Clock,
+    Download,
+    Sparkles,
+    Copy,
+    Check
 } from 'lucide-react';
 import { OFFICIAL_CALLER_SCENARIO, type CallerScriptLine } from '../data/demoScript';
+import { generateEmergencyIncidentPdf } from '../services/pdfReportGenerator';
 
 const EMERGENCY_DEPARTMENTS = [
     {
@@ -60,6 +62,9 @@ const VoiceAnalysis: React.FC = () => {
         timestamp: string;
         docketId: string;
     } | null>(null);
+
+    // AI Follow-up Questions clipboard state
+    const [copiedId, setCopiedId] = useState<string | null>(null);
 
     const timerRef = useRef<number | null>(null);
     const transcriptEndRef = useRef<HTMLDivElement | null>(null);
@@ -142,6 +147,137 @@ const VoiceAnalysis: React.FC = () => {
 
     // Dialect defaults to English at first, then updates to Hindi as audio plays
     const detectedDialect = displayedLines.length === 0 ? 'English (Default)' : 'Hindi (ग्रामीण हिंदी)';
+
+    // Copy follow up question to operator clipboard
+    const handleCopyQuestion = (id: string, text: string) => {
+        navigator.clipboard.writeText(text);
+        setCopiedId(id);
+        setTimeout(() => setCopiedId(null), 2000);
+    };
+
+    // Download comprehensive PDF incident report after call
+    const handleDownloadPdf = () => {
+        generateEmergencyIncidentPdf({
+            callId: scenario.callId,
+            callerNumber: scenario.callerNumber,
+            callerLocation: scenario.callerLocation,
+            dialect: detectedDialect,
+            durationFormatted: formatTimer(callDuration),
+            assessment: {
+                svi: currentAssessment.svi,
+                risk: currentAssessment.risk,
+                confidence: currentAssessment.confidence,
+                vulnerabilityDomain: currentAssessment.vulnerabilityDomain,
+                stressLevel: currentAssessment.stressLevel,
+                recommendedAction: currentAssessment.recommendedAction
+            },
+            lines: scenario.lines,
+            escalationDocket: escalationDocket,
+            dutyOfficer: 'Priya Sharma (OP-0482)'
+        });
+    };
+
+    // AI Dynamic Follow-up Questions synthesized specifically from victim's statements
+    const followUpQuestions = useMemo(() => {
+        const count = displayedLines.length;
+
+        if (callStatus === 'WAITING' || count === 0) {
+            return [
+                {
+                    id: 'q-initial-1',
+                    tag: 'SAFETY' as const,
+                    tagColor: 'bg-emerald-100 text-emerald-800 border-emerald-300',
+                    textHindi: 'क्या आप इस समय किसी सुरक्षित स्थान पर हैं जहाँ बिना किसी खतरे के बात कर सकते हैं?',
+                    textEnglish: 'Are you currently in a safe and secure spot to speak freely?',
+                    rationale: 'Initial Verification: Confirm caller physical safety prior to detailed inquiry.'
+                },
+                {
+                    id: 'q-initial-2',
+                    tag: 'LOCATION' as const,
+                    tagColor: 'bg-blue-100 text-blue-800 border-blue-300',
+                    textHindi: 'कृपया अपने गाँव का नाम, वार्ड और नज़दीकी मुख्य लैंडमार्क की पुष्टि करें।',
+                    textEnglish: 'Please confirm your exact village name, ward number, and nearest landmark.',
+                    rationale: 'GPS Verification: Validate village perimeter for QRT vehicle dispatch.'
+                }
+            ];
+        }
+
+        const list = [];
+
+        // When statement 4 or call completed: Imminent escalation and immediate rescue
+        if (count >= 4 || callStatus === 'ENDED') {
+            list.push({
+                id: 'q-line-4',
+                tag: 'SAFETY' as const,
+                tagColor: 'bg-red-100 text-red-900 border-red-400 font-bold',
+                textHindi: 'क्या आप और आपका परिवार किसी पक्के कमरे में अंदर से कुंडी लगाकर सुरक्षित हो सकते हैं जब तक पुलिस वैन पहुंचे?',
+                textEnglish: 'Can you and your family lock yourselves safely inside a secure room until the 112 QRT unit arrives?',
+                rationale: 'Critical Imminent Danger: Immediate life containment protocol pending unit arrival.'
+            });
+            list.push({
+                id: 'q-line-4b',
+                tag: 'LOCATION' as const,
+                tagColor: 'bg-blue-100 text-blue-800 border-blue-300',
+                textHindi: 'गाँव में 112 गश्ती वाहन के पहुंचने के लिए कोई मुख्य पक्की सड़क, स्कूल या मंदिर जैसा सीधा लैंडमार्क बताएं।',
+                textEnglish: 'Specify the nearest roadside landmark or junction for the incoming emergency intercept vehicle.',
+                rationale: 'Rural Navigation: Prevent field unit delays in unmapped village lanes.'
+            });
+        }
+
+        // When statement 3: Prior complaint filed, systemic neglect
+        if (count >= 3) {
+            list.push({
+                id: 'q-line-3',
+                tag: 'EVIDENCE' as const,
+                tagColor: 'bg-indigo-100 text-indigo-800 border-indigo-300',
+                textHindi: 'क्या स्थानीय थाने या चौकी में दी गई पुरानी शिकायत की कोई जीडी रसीद या डायरी नंबर आपके पास है?',
+                textEnglish: 'Do you have the GD / Diary entry number or written receipt from the previous complaint you filed?',
+                rationale: 'Systemic Neglect: Expedite direct supervisory escalation to District Superintendent.'
+            });
+        }
+
+        // When statement 2: Physical assault on brother & direct threats
+        if (count >= 2) {
+            list.push({
+                id: 'q-line-2a',
+                tag: 'MEDICAL' as const,
+                tagColor: 'bg-rose-100 text-rose-800 border-rose-300',
+                textHindi: 'क्या आपके घायल भाई को तत्काल 108 एम्बुलेंस या अस्पताल ले जाने की आवश्यकता है?',
+                textEnglish: 'Does your assaulted brother have open wounds or require an immediate 108 ambulance dispatch?',
+                rationale: 'Active Trauma: Triage medical emergency services simultaneously.'
+            });
+            list.push({
+                id: 'q-line-2b',
+                tag: 'SAFETY' as const,
+                tagColor: 'bg-amber-100 text-amber-800 border-amber-300',
+                textHindi: 'क्या मारपीट या धमकियों के दौरान हमलावरों के पास लाठी, डंडे या किसी प्रकार के हथियार मौजूद थे?',
+                textEnglish: 'Were any weapons, lathis, or sharp instruments brandished or used by the attackers?',
+                rationale: 'Threat Severity: Arming protocol assessment for QRT field responders.'
+            });
+        }
+
+        // When statement 1: Caste harassment & village humiliation
+        if (count >= 1) {
+            list.push({
+                id: 'q-line-1a',
+                tag: 'EVIDENCE' as const,
+                tagColor: 'bg-purple-100 text-purple-800 border-purple-300',
+                textHindi: 'जातिगत गाली-गलौज और परेशान करने वाले मुख्य व्यक्तियों के नाम या उनके परिवार की पहचान बताएं।',
+                textEnglish: 'Can you state the specific names or families in the village responsible for the harassment?',
+                rationale: 'Statutory Identification: SC/ST (PoA) Act offense documentation.'
+            });
+            list.push({
+                id: 'q-line-1b',
+                tag: 'SAFETY' as const,
+                tagColor: 'bg-red-100 text-red-800 border-red-300',
+                textHindi: 'क्या वे लोग इस समय आपके घर या रास्ते के बाहर जमा हैं?',
+                textEnglish: 'Are the perpetrators currently assembled outside your residence or lane right now?',
+                rationale: 'Physical Containment: Assess whether mob is actively surrounding the caller.'
+            });
+        }
+
+        return list.slice(0, 4);
+    }, [displayedLines.length, callStatus]);
 
     // Dynamic progressive AI distress classification:
     // Starts at absolute 0 and moves up/down in real time as speech is transcribed
@@ -250,6 +386,16 @@ const VoiceAnalysis: React.FC = () => {
                 </div>
 
                 <div className="flex items-center gap-2">
+                    {callStatus === 'ENDED' && (
+                        <button
+                            onClick={handleDownloadPdf}
+                            className="px-3 py-1.5 bg-blue-900 hover:bg-blue-950 text-white text-xs font-semibold rounded border border-blue-900 flex items-center gap-1.5 cursor-pointer transition-colors shadow-xs"
+                            title="Download Incident Report as PDF"
+                        >
+                            <Download size={13} />
+                            <span>Download PDF Report</span>
+                        </button>
+                    )}
                     <button
                         onClick={handleReset}
                         className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded border border-slate-300 flex items-center gap-1.5 cursor-pointer transition-colors"
@@ -271,9 +417,8 @@ const VoiceAnalysis: React.FC = () => {
                     <div className="bg-white border border-slate-300 rounded-md p-4 shadow-xs space-y-4">
                         {/* Tab Title & Line Status */}
                         <div className="flex items-center justify-between border-b border-slate-200 pb-2.5">
-                            <span className="text-xs font-bold text-slate-900 uppercase tracking-wide flex items-center gap-1.5">
-                                <Activity size={14} className="text-blue-900" />
-                                <span>Emergency Line Status</span>
+                            <span className="text-xs font-bold text-slate-900 uppercase tracking-wide">
+                                Emergency Line Status
                             </span>
                             {callStatus === 'WAITING' && (
                                 <span className="bg-amber-100 text-amber-900 border border-amber-300 text-[10px] font-bold px-2 py-0.5 rounded animate-pulse">
@@ -352,13 +497,23 @@ const VoiceAnalysis: React.FC = () => {
                             )}
 
                             {callStatus === 'ENDED' && (
-                                <button
-                                    onClick={handlePickUpCall}
-                                    className="w-full bg-blue-900 hover:bg-blue-950 text-white font-bold py-2.5 px-3 rounded text-xs flex items-center justify-center gap-2 cursor-pointer transition-colors"
-                                >
-                                    <RotateCcw size={14} />
-                                    <span>Reset Call Session</span>
-                                </button>
+                                <div className="space-y-2">
+                                    <button
+                                        onClick={handleDownloadPdf}
+                                        className="w-full bg-blue-900 hover:bg-blue-950 text-white font-bold py-2.5 px-3 rounded text-xs flex items-center justify-center gap-2 shadow-xs cursor-pointer transition-colors"
+                                    >
+                                        <Download size={15} />
+                                        <span>Download Incident Report (PDF)</span>
+                                    </button>
+
+                                    <button
+                                        onClick={handlePickUpCall}
+                                        className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold py-2 px-3 rounded text-xs flex items-center justify-center gap-2 border border-slate-300 cursor-pointer transition-colors"
+                                    >
+                                        <RotateCcw size={14} />
+                                        <span>Reset Call Session</span>
+                                    </button>
+                                </div>
                             )}
                         </div>
 
@@ -369,8 +524,82 @@ const VoiceAnalysis: React.FC = () => {
                             ) : callStatus === 'CONNECTED' ? (
                                 <p className="text-emerald-900 font-medium">Line connected. Live dialogue streaming in center panel.</p>
                             ) : (
-                                <p>Call disconnected. Review triage assessment on the right.</p>
+                                <p>Call disconnected. Review triage assessment or download incident PDF report.</p>
                             )}
+                        </div>
+                    </div>
+
+                    {/* ------------------------------------------------------------- */}
+                    {/* Bottom Left Corner: AI Suggested Follow-Up Questions Panel    */}
+                    {/* ------------------------------------------------------------- */}
+                    <div className="bg-white border border-slate-300 rounded-md p-3.5 shadow-xs space-y-3">
+                        <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                            <div className="flex items-center gap-1.5">
+                                <Sparkles size={13} className="text-amber-600" />
+                                <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wide">
+                                    AI Suggested Follow-Up Questions
+                                </h3>
+                            </div>
+                            <span className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded border ${
+                                callStatus === 'CONNECTED'
+                                    ? 'bg-emerald-50 text-emerald-800 border-emerald-300 animate-pulse'
+                                    : callStatus === 'ENDED'
+                                    ? 'bg-blue-50 text-blue-900 border-blue-200'
+                                    : 'bg-slate-100 text-slate-600 border-slate-200'
+                            }`}>
+                                {callStatus === 'CONNECTED' ? 'LIVE NLP ADVISORY' : callStatus === 'ENDED' ? 'POST-CALL INQUIRY' : 'STANDBY'}
+                            </span>
+                        </div>
+
+                        <p className="text-[10px] text-slate-500 font-light leading-tight">
+                            Specific inquiries dynamically suggested from the caller's statements to guide operator interrogation:
+                        </p>
+
+                        <div className="space-y-2">
+                            {followUpQuestions.map((q) => (
+                                <div
+                                    key={q.id}
+                                    className="p-2.5 rounded border border-slate-200 bg-slate-50/80 hover:bg-slate-50 transition-colors text-xs space-y-1.5"
+                                >
+                                    <div className="flex items-center justify-between">
+                                        <span className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded border ${q.tagColor}`}>
+                                            [{q.tag}]
+                                        </span>
+                                        <button
+                                            onClick={() => handleCopyQuestion(q.id, q.textHindi)}
+                                            className="text-[10px] font-mono text-slate-500 hover:text-slate-800 flex items-center gap-1 cursor-pointer transition-colors px-1.5 py-0.5 rounded hover:bg-slate-200/60"
+                                            title="Copy question text"
+                                        >
+                                            {copiedId === q.id ? (
+                                                <>
+                                                    <Check size={11} className="text-emerald-600" />
+                                                    <span className="text-emerald-700 font-bold">Copied</span>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Copy size={11} />
+                                                    <span>Copy</span>
+                                                </>
+                                            )}
+                                        </button>
+                                    </div>
+
+                                    {/* Primary Hindi question for caller */}
+                                    <p className="font-semibold text-slate-900 text-xs leading-snug">
+                                        "{q.textHindi}"
+                                    </p>
+
+                                    {/* English operator guidance */}
+                                    <p className="text-[11px] text-slate-600 italic font-light leading-snug">
+                                        Guide: {q.textEnglish}
+                                    </p>
+
+                                    {/* AI Context reasoning */}
+                                    <div className="text-[9px] font-mono text-slate-400 border-t border-slate-200/70 pt-1">
+                                        AI Context: {q.rationale}
+                                    </div>
+                                </div>
+                            ))}
                         </div>
                     </div>
                 </div>
@@ -383,9 +612,8 @@ const VoiceAnalysis: React.FC = () => {
                         {/* Transcript Box Header */}
                         <div className="flex items-center justify-between pb-2.5 border-b border-slate-200 mb-3">
                             <div>
-                                <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wide flex items-center gap-1.5">
-                                    <FileText size={15} className="text-blue-950" />
-                                    <span>Live Caller Audio Speech Transcription</span>
+                                <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wide">
+                                    Live Caller Audio Speech Transcription
                                 </h3>
                                 <p className="text-[11px] text-slate-500 font-light mt-0.5">
                                     Real-time transcript of caller audio (Operator audio suppressed)
@@ -484,18 +712,13 @@ const VoiceAnalysis: React.FC = () => {
 
                         {/* Official Header Banner */}
                         <div className="bg-blue-950 text-white px-4 py-3 border-b border-blue-900 flex items-center justify-between">
-                            <div className="flex items-center gap-2.5">
-                                <div className="w-7 h-7 rounded bg-blue-900 border border-blue-700 flex items-center justify-center text-amber-400">
-                                    <Shield size={15} />
-                                </div>
-                                <div>
-                                    <span className="text-[9px] font-mono text-blue-300 uppercase tracking-widest block font-semibold">
-                                        GOVERNMENT OF INDIA • ERSS 112
-                                    </span>
-                                    <h3 className="text-xs font-bold text-white uppercase tracking-wide">
-                                        AI Distress Classification Desk
-                                    </h3>
-                                </div>
+                            <div>
+                                <span className="text-[9px] font-mono text-blue-300 uppercase tracking-widest block font-semibold">
+                                    GOVERNMENT OF INDIA • ERSS 112
+                                </span>
+                                <h3 className="text-xs font-bold text-white uppercase tracking-wide">
+                                    AI Distress Classification Desk
+                                </h3>
                             </div>
                             <span className={`${currentAssessment.badgeClass} text-[10px] font-bold px-2 py-0.5 rounded font-mono border uppercase tracking-wider`}>
                                 {currentAssessment.risk}
