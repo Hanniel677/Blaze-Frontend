@@ -4,7 +4,6 @@ import {
     PhoneOff,
     PhoneIncoming,
     CheckCircle2,
-    RotateCcw,
     Siren,
     Radio,
     MapPin,
@@ -18,8 +17,14 @@ import {
     Copy,
     Check
 } from 'lucide-react';
-import { OFFICIAL_CALLER_SCENARIO, type CallerScriptLine } from '../data/demoScript';
+import { OFFICIAL_CALLER_SCENARIO, SAMPLE_PRE_RECORDED_CALLS, type CallerScriptLine } from '../data/demoScript';
 import { generateEmergencyIncidentPdf } from '../services/pdfReportGenerator';
+
+const CALL_SCENARIOS = [
+    OFFICIAL_CALLER_SCENARIO,
+    SAMPLE_PRE_RECORDED_CALLS[1].scenario,
+    SAMPLE_PRE_RECORDED_CALLS[2].scenario
+];
 
 const EMERGENCY_DEPARTMENTS = [
     {
@@ -69,7 +74,9 @@ const VoiceAnalysis: React.FC = () => {
     const timerRef = useRef<number | null>(null);
     const transcriptEndRef = useRef<HTMLDivElement | null>(null);
 
-    const scenario = OFFICIAL_CALLER_SCENARIO;
+    const [scenarioIndex, setScenarioIndex] = useState(0);
+    const scenario = CALL_SCENARIOS[scenarioIndex];
+    const [nextCallCountdown, setNextCallCountdown] = useState<number | null>(null);
 
     // Auto-scroll transcript container as new lines stream in
     useEffect(() => {
@@ -121,14 +128,33 @@ const VoiceAnalysis: React.FC = () => {
         setDisplayedLines(scenario.lines);
     };
 
-    const handleReset = () => {
-        if (timerRef.current) clearInterval(timerRef.current);
-        setCallStatus('WAITING');
-        setCallDuration(0);
-        setDisplayedLines([]);
-        setEscalated(false);
-        setEscalationDocket(null);
-    };
+    // Automatically transition to next incoming call and reset session after call ends
+    useEffect(() => {
+        if (callStatus !== 'ENDED') {
+            setNextCallCountdown(null);
+            return;
+        }
+
+        setNextCallCountdown(5);
+        const interval = window.setInterval(() => {
+            setNextCallCountdown((prev) => {
+                if (prev === null || prev <= 1) {
+                    clearInterval(interval);
+                    // Auto-reset state for new incoming call
+                    setCallStatus('WAITING');
+                    setCallDuration(0);
+                    setDisplayedLines([]);
+                    setEscalated(false);
+                    setEscalationDocket(null);
+                    setScenarioIndex((current) => (current + 1) % CALL_SCENARIOS.length);
+                    return null;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+
+        return () => clearInterval(interval);
+    }, [callStatus]);
 
     const handleEscalateCall = () => {
         setEscalated(true);
@@ -396,14 +422,6 @@ const VoiceAnalysis: React.FC = () => {
                             <span>Download PDF Report</span>
                         </button>
                     )}
-                    <button
-                        onClick={handleReset}
-                        className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded border border-slate-300 flex items-center gap-1.5 cursor-pointer transition-colors"
-                        title="Reset Call"
-                    >
-                        <RotateCcw size={13} />
-                        <span>Reset Call</span>
-                    </button>
                 </div>
             </div>
 
@@ -497,23 +515,13 @@ const VoiceAnalysis: React.FC = () => {
                             )}
 
                             {callStatus === 'ENDED' && (
-                                <div className="space-y-2">
-                                    <button
-                                        onClick={handleDownloadPdf}
-                                        className="w-full bg-blue-900 hover:bg-blue-950 text-white font-bold py-2.5 px-3 rounded text-xs flex items-center justify-center gap-2 shadow-xs cursor-pointer transition-colors"
-                                    >
-                                        <Download size={15} />
-                                        <span>Download Incident Report (PDF)</span>
-                                    </button>
-
-                                    <button
-                                        onClick={handlePickUpCall}
-                                        className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold py-2 px-3 rounded text-xs flex items-center justify-center gap-2 border border-slate-300 cursor-pointer transition-colors"
-                                    >
-                                        <RotateCcw size={14} />
-                                        <span>Reset Call Session</span>
-                                    </button>
-                                </div>
+                                <button
+                                    onClick={handleDownloadPdf}
+                                    className="w-full bg-blue-900 hover:bg-blue-950 text-white font-bold py-2.5 px-3 rounded text-xs flex items-center justify-center gap-2 shadow-xs cursor-pointer transition-colors"
+                                >
+                                    <Download size={15} />
+                                    <span>Download Incident Report (PDF)</span>
+                                </button>
                             )}
                         </div>
 
@@ -524,7 +532,13 @@ const VoiceAnalysis: React.FC = () => {
                             ) : callStatus === 'CONNECTED' ? (
                                 <p className="text-emerald-900 font-medium">Line connected. Live dialogue streaming in center panel.</p>
                             ) : (
-                                <p>Call disconnected. Review triage assessment or download incident PDF report.</p>
+                                <p>
+                                    Call ended. Report archived. {nextCallCountdown !== null ? (
+                                        <span className="font-semibold text-blue-900">Next incoming call ringing in {nextCallCountdown}s (auto-resetting)...</span>
+                                    ) : (
+                                        'Preparing line for incoming call...'
+                                    )}
+                                </p>
                             )}
                         </div>
                     </div>
