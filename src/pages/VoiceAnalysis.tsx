@@ -413,8 +413,8 @@ const VoiceAnalysis: React.FC = () => {
                 {/* ------------------------------------------------------------- */}
                 {/* 1. LEFT COLUMN (3/12): Emergency Line Status Tab               */}
                 {/* ------------------------------------------------------------- */}
-                <div className="lg:col-span-3 space-y-4">
-                    <div className="bg-white border border-slate-300 rounded-md p-4 shadow-xs space-y-4">
+                <div className="lg:col-span-3 space-y-3 flex flex-col lg:h-[650px]">
+                    <div className="bg-white border border-slate-300 rounded-md p-3.5 shadow-xs space-y-3 shrink-0">
                         {/* Tab Title & Line Status */}
                         <div className="flex items-center justify-between border-b border-slate-200 pb-2.5">
                             <span className="text-xs font-bold text-slate-900 uppercase tracking-wide">
@@ -532,8 +532,8 @@ const VoiceAnalysis: React.FC = () => {
                     {/* ------------------------------------------------------------- */}
                     {/* Bottom Left Corner: AI Suggested Follow-Up Questions Panel    */}
                     {/* ------------------------------------------------------------- */}
-                    <div className="bg-white border border-slate-300 rounded-md p-3.5 shadow-xs space-y-3">
-                        <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                    <div className="bg-white border border-slate-300 rounded-md p-3.5 shadow-xs flex-1 min-h-0 flex flex-col overflow-hidden">
+                        <div className="flex items-center justify-between border-b border-slate-200 pb-2 shrink-0">
                             <div className="flex items-center gap-1.5">
                                 <Sparkles size={13} className="text-amber-600" />
                                 <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wide">
@@ -551,11 +551,11 @@ const VoiceAnalysis: React.FC = () => {
                             </span>
                         </div>
 
-                        <p className="text-[10px] text-slate-500 font-light leading-tight">
+                        <p className="text-[10px] text-slate-500 font-light leading-tight mt-1.5 mb-2 shrink-0">
                             Specific inquiries dynamically suggested from the caller's statements to guide operator interrogation:
                         </p>
 
-                        <div className="space-y-2">
+                        <div className="flex-1 min-h-0 overflow-y-auto space-y-2 pr-1">
                             {followUpQuestions.map((q) => (
                                 <div
                                     key={q.id}
